@@ -313,6 +313,10 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
 .proj-arch-title{font-size:11px;color:#9AB;margin-bottom:12px;cursor:pointer;user-select:none;}
 .proj-card-archived{opacity:.6;border-style:dashed;}
 .proj-card-archived .proj-card-accent{background:#B0C8BC;}
+.dash-data-btn{background:#fff;color:#555;border:1.5px solid #D5E6DC;border-radius:6px;
+  padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;}
+.dash-data-btn:hover{background:#EAF5EE;border-color:#007A3E;color:#007A3E;}
+.dash-topbar-right{display:flex;align-items:center;gap:8px;}
 .btn-back{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);
   border-radius:4px;padding:5px 12px;font-size:11px;cursor:pointer;display:none;}
 .btn-back:hover{background:rgba(255,255,255,.25);}
@@ -381,7 +385,11 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
       <div class="dash-title">📂 项目管理</div>
       <div class="dash-subtitle">所有项目数据本地保存，永久保留</div>
     </div>
-    <button class="dash-new-btn" onclick="createNewProject()">＋ 新建项目</button>
+    <div class="dash-topbar-right">
+      <button class="dash-data-btn" onclick="importData()" title="从备份文件恢复数据">📥 导入备份</button>
+      <button class="dash-data-btn" onclick="exportData()" title="将所有数据导出为 JSON 文件">📤 导出备份</button>
+      <button class="dash-new-btn" onclick="createNewProject()">＋ 新建项目</button>
+    </div>
   </div>
   <div class="proj-grid" id="projGrid"></div>
   <div class="proj-arch-section" id="archSection" style="display:none;">
@@ -1989,6 +1997,55 @@ function toggleArchived(){
   const t=document.querySelector('.proj-arch-title');
   g.style.display=archVisible?'grid':'none';
   t.textContent=(archVisible?'▲':'▼')+' 已归档项目（点击'+(archVisible?'收起':'展开')+'）';
+}
+
+// ══════════════════════════════════════════════
+//  DATA EXPORT / IMPORT (便携备份)
+// ══════════════════════════════════════════════
+function exportData(){
+  const payload={
+    _app:'yichu-meeting-gen',
+    _version:'1.0',
+    exportedAt:new Date().toISOString(),
+    users:authUsers(),
+    projects:pmLoad()
+  };
+  const json=JSON.stringify(payload,null,2);
+  const blob=new Blob([json],{type:'application/json;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  const dateStr=new Date().toLocaleDateString('zh-CN').replace(/\//g,'-');
+  a.download=`储能项目数据备份_${dateStr}.json`;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function importData(){
+  const input=document.createElement('input');
+  input.type='file';input.accept='.json,application/json';
+  input.onchange=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const d=JSON.parse(ev.target.result);
+        if(d._app!=='yichu-meeting-gen'||!d.projects) throw new Error('不是有效的备份文件');
+        const uLen=(d.users||[]).length;
+        const pLen=(d.projects.projects||[]).length;
+        if(!confirm(`准备导入备份：\n👤 用户账号 ${uLen} 个\n📂 项目 ${pLen} 个\n\n⚠️ 将覆盖本设备所有现有数据，确认继续？`))return;
+        if(d.users) localStorage.setItem(AUTH_KEY,JSON.stringify(d.users));
+        pmSave(d.projects);
+        clearSession();
+        alert('✅ 导入成功！请用原账号重新登录。');
+        location.reload();
+      }catch(err){
+        alert('❌ 导入失败：'+err.message);
+      }
+    };
+    reader.readAsText(file,'utf-8');
+  };
+  input.click();
 }
 
 // ══════════════════════════════════════════════
