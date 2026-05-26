@@ -468,13 +468,15 @@ const D = {
 };
 
 const SLIDES = [
-  {id:'s1', num:'一', name:'项目基本情况',           short:'基本情况'},
-  {id:'s2', num:'二', name:'政策信息',               short:'政策信息'},
-  {id:'s3', num:'三', name:'项目具体选址',           short:'项目选址'},
-  {id:'s4', num:'四', name:'电力接入与周边场站情况', short:'电力接入'},
-  {id:'s8', num:'五', name:'合作思路及合作条件',     short:'合作思路'},
-  {id:'s9', num:'六', name:'项目经济性分析（费用）', short:'成本分析'},
-  {id:'s11',num:'七', name:'存在的问题及应对措施',  short:'问题措施'}
+  {id:'s0',   num:'封面', name:'封面',                     short:'封面'},
+  {id:'sMenu',num:'目录', name:'目录',                     short:'目录'},
+  {id:'s1',   num:'一',   name:'项目基本情况',             short:'基本情况'},
+  {id:'s2',   num:'二',   name:'政策信息',                 short:'政策信息'},
+  {id:'s3',   num:'三',   name:'项目具体选址',             short:'项目选址'},
+  {id:'s4',   num:'四',   name:'电力接入与周边场站情况',   short:'电力接入'},
+  {id:'s8',   num:'五',   name:'合作思路及合作条件',       short:'合作思路'},
+  {id:'s9',   num:'六',   name:'项目经济性分析（费用）',   short:'成本分析'},
+  {id:'s11',  num:'七',   name:'存在的问题及应对措施',     short:'问题措施'}
 ];
 
 let curIdx=0, pmIdx=0;
@@ -550,6 +552,46 @@ function renderS0(){
     </div>
     <div style="font-size:10px;color:rgba(255,255,255,.5);">${d.dept||'项目开发部'}</div>
     <div class="cover-date">${d.reportDate||'——'}</div>
+  </div>`;
+}
+
+function renderSMenu(){
+  const contentSlides=[
+    {num:'一', name:'项目基本情况',           desc:'地址·容量·土地·接入·建设计划'},
+    {num:'二', name:'政策信息',               desc:'国家及地方政策支持'},
+    {num:'三', name:'项目具体选址',           desc:'地块情况·区位图·现场照片'},
+    {num:'四', name:'电力接入与周边场站情况', desc:'变电站·电压等级·外线距离'},
+    {num:'五', name:'合作思路及合作条件',     desc:'合作步骤·资源费·股权结构'},
+    {num:'六', name:'项目经济性分析（费用）', desc:'投资成本·费用明细'},
+    {num:'七', name:'存在的问题及应对措施',   desc:'风险分析·解决方案'},
+  ];
+  const pname=projectShortName();
+  return `<div style="display:flex;flex-direction:column;height:100%;background:#fff;">
+    <div class="sl-hdr">
+      <div class="sl-badge" style="font-size:10px;letter-spacing:-.5px;">目录</div>
+      <div class="sl-title">汇报目录</div>
+      <div class="sl-meta">${pname}<br>机密 · 上会材料</div>
+    </div>
+    <div class="sl-hdr-line"></div>
+    <div class="sl-body" style="display:flex;align-items:center;">
+      <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:7px 18px;">
+        ${contentSlides.map((s,i)=>`
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;
+            border-radius:4px;background:${i%2===0?'#F5FAF7':'#FAFFFE'};
+            border-left:3px solid ${['#007A3E','#00963A','#34A85A','#5BBE78','#82CE98','#A8DDB5','#C8EDD6'][i]||'#007A3E'};">
+            <div style="min-width:26px;height:26px;border-radius:50%;
+              background:${['#007A3E','#00963A','#34A85A','#5BBE78','#82CE98','#A8DDB5','#C8EDD6'][i]||'#007A3E'};
+              color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              ${s.num}
+            </div>
+            <div style="min-width:0;">
+              <div style="font-size:11px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
+              <div style="font-size:8.5px;color:#888;margin-top:1px;">${s.desc}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="sl-footer">目录页 &nbsp;|&nbsp; 深圳易储数智能源集团有限公司 &nbsp;|&nbsp; 机密文件</div>
   </div>`;
 }
 
@@ -1101,7 +1143,7 @@ function renderS11(){
 }
 
 function renderSlide(idx){
-  const fns=[renderS1,renderS2,renderS3,renderS4,renderS8,renderS9,renderS11];
+  const fns=[renderS0,renderSMenu,renderS1,renderS2,renderS3,renderS4,renderS8,renderS9,renderS11];
   return fns[idx]();
 }
 
@@ -1447,8 +1489,18 @@ function renderF11(){
   ${sec('需决策事项',fg('需明确/决策的紧急事项',ta('urgency','s11','如：该项目参与竞企较多，需我司尽快决策...',3)))}`;
 }
 
+function renderFMenu(){
+  return `<div class="fp-hdr">📑 目录页</div>
+  <div style="padding:14px;background:#F5FAF7;border-radius:6px;margin:12px 14px;font-size:12px;color:#555;line-height:2;">
+    <div style="font-weight:600;color:#007A3E;margin-bottom:6px;">目录内容自动同步</div>
+    目录页根据各章节标题自动生成，无需手动填写。<br>
+    如需修改目录项标题，请切换到对应幻灯片页面进行编辑。<br><br>
+    <span style="color:#888;font-size:11px;">当前包含 7 个正文章节，目录自动列示。</span>
+  </div>`;
+}
+
 function renderForm(idx){
-  const fns=[renderF1,renderF2,renderF3,renderF4,renderF8,renderF9,renderF11];
+  const fns=[renderF0,renderFMenu,renderF1,renderF2,renderF3,renderF4,renderF8,renderF9,renderF11];
   return fns[idx]();
 }
 
