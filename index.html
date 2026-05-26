@@ -247,6 +247,40 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
 ::-webkit-scrollbar-track{background:#F0F4F1;}
 ::-webkit-scrollbar-thumb{background:#B8DECA;border-radius:3px;}
 ::-webkit-scrollbar-thumb:hover{background:#007A3E;}
+
+/* ========== AUTH SCREEN ========== */
+#authScreen{position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(145deg,#003A20 0%,#005A2D 40%,#007A3E 75%,#00963A 100%);
+  display:flex;align-items:center;justify-content:center;}
+#authScreen::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 20% 80%,rgba(255,255,255,.04) 0%,transparent 60%),
+             radial-gradient(ellipse at 80% 20%,rgba(255,255,255,.06) 0%,transparent 50%);
+  pointer-events:none;}
+.auth-card{background:#fff;border-radius:14px;padding:38px 34px 28px;width:370px;
+  box-shadow:0 24px 64px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.08);position:relative;z-index:1;}
+.auth-logo{font-size:38px;text-align:center;margin-bottom:6px;}
+.auth-brand{font-size:14px;font-weight:800;color:#003A20;text-align:center;letter-spacing:.02em;}
+.auth-brand-sub{font-size:10px;color:#9AB5A5;text-align:center;margin-top:3px;margin-bottom:22px;}
+.auth-tabs{display:flex;background:#F0F4F1;border-radius:7px;padding:3px;margin-bottom:20px;gap:3px;}
+.auth-tab{flex:1;border:none;background:none;padding:8px 0;font-size:13px;font-weight:600;
+  border-radius:5px;cursor:pointer;color:#7A9E8C;transition:all .18s;}
+.auth-tab.active{background:#007A3E;color:#fff;box-shadow:0 2px 6px rgba(0,122,62,.3);}
+.auth-input{width:100%;padding:11px 13px;border:1.5px solid #D5E6DC;border-radius:7px;
+  font-size:13px;outline:none;margin-bottom:10px;transition:border-color .15s;font-family:inherit;
+  box-sizing:border-box;}
+.auth-input:focus{border-color:#007A3E;box-shadow:0 0 0 3px rgba(0,122,62,.1);}
+.auth-err{font-size:11px;color:#D32F2F;min-height:16px;margin-bottom:4px;padding-left:2px;}
+.auth-ok{font-size:11px;color:#007A3E;min-height:16px;margin-bottom:4px;padding-left:2px;}
+.auth-btn{width:100%;background:#007A3E;color:#fff;border:none;border-radius:7px;
+  padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;
+  transition:background .15s,box-shadow .15s;letter-spacing:.04em;}
+.auth-btn:hover{background:#005A2D;box-shadow:0 4px 12px rgba(0,122,62,.35);}
+.auth-footer{font-size:10px;color:#B8D0C0;text-align:center;margin-top:18px;line-height:1.7;}
+.auth-divider{height:1px;background:#EEF5F1;margin:10px 0 14px;}
+.user-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;
+  color:rgba(255,255,255,.75);background:rgba(255,255,255,.12);border-radius:4px;
+  padding:4px 10px;margin-right:4px;}
+
 /* ========== PROJECT DASHBOARD ========== */
 #dashboard{display:none;flex:1;overflow-y:auto;padding:32px 40px;background:#F0F4F1;}
 .dash-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
@@ -286,6 +320,40 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
 </head>
 <body>
 
+<!-- AUTH SCREEN -->
+<div id="authScreen" style="display:none;">
+  <div class="auth-card">
+    <div class="auth-logo">⚡</div>
+    <div class="auth-brand">储能项目上会材料生成系统</div>
+    <div class="auth-brand-sub">电网侧独立共享储能电站 · 投资决策委员会</div>
+    <div class="auth-tabs">
+      <button id="tabLogin" class="auth-tab active" onclick="switchTab('login')">登 录</button>
+      <button id="tabReg"   class="auth-tab"        onclick="switchTab('reg')">注 册</button>
+    </div>
+    <!-- Login panel -->
+    <div id="panelLogin">
+      <input id="loginUser" class="auth-input" type="text"     placeholder="用户名"
+             onkeydown="if(event.key==='Enter')$('loginPass').focus()">
+      <input id="loginPass" class="auth-input" type="password" placeholder="密码"
+             onkeydown="if(event.key==='Enter')doLogin()">
+      <div id="loginErr" class="auth-err"></div>
+      <button class="auth-btn" onclick="doLogin()">登 录</button>
+    </div>
+    <!-- Register panel -->
+    <div id="panelReg" style="display:none;">
+      <input id="regUser"  class="auth-input" type="text"     placeholder="用户名（2–20 个字符）"
+             onkeydown="if(event.key==='Enter')$('regPass').focus()">
+      <input id="regPass"  class="auth-input" type="password" placeholder="密码（至少 6 位）"
+             onkeydown="if(event.key==='Enter')$('regPass2').focus()">
+      <input id="regPass2" class="auth-input" type="password" placeholder="确认密码"
+             onkeydown="if(event.key==='Enter')doRegister()">
+      <div id="regErr" class="auth-err"></div>
+      <button class="auth-btn" onclick="doRegister()">注 册</button>
+    </div>
+    <div class="auth-footer">数据仅保存在本设备浏览器 · 安全私密 · 无需联网</div>
+  </div>
+</div>
+
 <!-- HEADER -->
 <header class="hdr">
   <div class="hdr-logo">
@@ -301,6 +369,8 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
     <button class="btn btn-ghost btn-sm" id="btnPreview" onclick="previewAll()">👁 全屏预览</button>
     <button class="btn btn-ghost btn-sm" id="btnExport" onclick="exportHTML()">📋 生成报告</button>
     <button class="btn btn-ghost btn-sm" id="btnPrint" onclick="printAll()">🖨 打印/导出</button>
+    <span class="user-badge" id="userBadge" style="display:none;"></span>
+    <button class="btn btn-ghost btn-sm" id="btnLogout" style="display:none;" onclick="doLogout()">退出登录</button>
   </div>
 </header>
 
@@ -1675,6 +1745,103 @@ function exportHTML(){printAll();}
 // ══════════════════════════════════════════════
 //  PROJECT MANAGEMENT (localStorage)
 // ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
+//  AUTH — 本地多用户（数据存 localStorage）
+// ══════════════════════════════════════════════
+const AUTH_KEY ='yichu_users';
+const SESS_KEY ='yichu_session';
+
+// 简单哈希（本地存储，非网络传输，满足隐私需求）
+function hashPass(str){
+  let h=5381;
+  for(let i=0;i<str.length;i++) h=((h<<5)+h)^str.charCodeAt(i);
+  return (h>>>0).toString(36);
+}
+function authUsers(){
+  try{return JSON.parse(localStorage.getItem(AUTH_KEY)||'[]');}catch(e){return [];}
+}
+function authSaveUsers(u){localStorage.setItem(AUTH_KEY,JSON.stringify(u));}
+function getSession(){
+  try{return JSON.parse(localStorage.getItem(SESS_KEY)||'null');}catch(e){return null;}
+}
+function setSession(s){localStorage.setItem(SESS_KEY,JSON.stringify(s));}
+function clearSession(){localStorage.removeItem(SESS_KEY);}
+
+function switchTab(tab){
+  const isLogin=tab==='login';
+  $('tabLogin').className='auth-tab'+(isLogin?' active':'');
+  $('tabReg').className='auth-tab'+(!isLogin?' active':'');
+  $('panelLogin').style.display=isLogin?'':'none';
+  $('panelReg').style.display=isLogin?'none':'';
+  $('loginErr').textContent='';
+  $('regErr').textContent='';
+}
+
+function doLogin(){
+  const u=$('loginUser').value.trim();
+  const p=$('loginPass').value;
+  const err=$('loginErr');
+  if(!u||!p){err.textContent='请填写用户名和密码';return;}
+  const users=authUsers();
+  const found=users.find(x=>x.username===u&&x.passwordHash===hashPass(p));
+  if(!found){err.textContent='用户名或密码错误，请检查后重试';return;}
+  err.textContent='';
+  setSession({userId:found.id,username:found.username});
+  showApp();
+}
+
+function doRegister(){
+  const u=$('regUser').value.trim();
+  const p=$('regPass').value;
+  const p2=$('regPass2').value;
+  const err=$('regErr');
+  if(!u){err.textContent='请填写用户名';return;}
+  if(u.length<2||u.length>20){err.textContent='用户名须 2–20 个字符';return;}
+  if(!p||p.length<6){err.textContent='密码须至少 6 位';return;}
+  if(p!==p2){err.textContent='两次输入的密码不一致';return;}
+  const users=authUsers();
+  if(users.find(x=>x.username===u)){err.textContent='该用户名已被注册，请换一个';return;}
+  const id='u_'+Date.now();
+  users.push({id,username:u,passwordHash:hashPass(p),createdAt:new Date().toISOString()});
+  authSaveUsers(users);
+  err.textContent='';
+  setSession({userId:id,username:u});
+  showApp();
+}
+
+function doLogout(){
+  if(!confirm(`确认退出「${getSession()?.username||''}」的登录？`)) return;
+  saveCurrentProject();
+  clearSession();
+  currentProjectId=null;
+  // 隐藏所有区域
+  $('appBody').style.display='none';
+  $('dashboard').style.display='none';
+  $('btnBack').style.display='none';
+  ['btnPreview','btnExport','btnPrint'].forEach(b=>$(b).style.display='none');
+  $('hdrInfo').style.display='none';
+  $('userBadge').style.display='none';
+  $('btnLogout').style.display='none';
+  // 重置登录表单
+  $('loginUser').value='';$('loginPass').value='';$('loginErr').textContent='';
+  switchTab('login');
+  $('authScreen').style.display='flex';
+}
+
+function showApp(){
+  const sess=getSession();
+  if(!sess) return;
+  $('authScreen').style.display='none';
+  $('userBadge').textContent='👤 '+sess.username;
+  $('userBadge').style.display='';
+  $('btnLogout').style.display='';
+  $('dashboard').style.display='block';
+  renderDashboard();
+}
+
+// ══════════════════════════════════════════════
+//  PROJECT MANAGER
+// ══════════════════════════════════════════════
 const PM_KEY='yichu_projects';
 let currentProjectId=null;
 
@@ -1682,7 +1849,9 @@ function pmLoad(){return JSON.parse(localStorage.getItem(PM_KEY)||'{"projects":[
 function pmSave(store){localStorage.setItem(PM_KEY,JSON.stringify(store));}
 
 function getProjects(includeArchived=false){
-  return pmLoad().projects.filter(p=>includeArchived||!p.deleted);
+  const uid=getSession()?.userId;
+  // 显示当前用户的项目；历史遗留无 userId 的项目对所有用户可见
+  return pmLoad().projects.filter(p=>(p.userId===uid||!p.userId)&&(includeArchived||!p.deleted));
 }
 
 // Deep clone D as default data for new project
@@ -1693,8 +1862,9 @@ function createNewProject(){
   if(!name||!name.trim()) return;
   const store=pmLoad();
   const id='p_'+Date.now();
+  const uid=getSession()?.userId||null;
   store.projects.unshift({
-    id, name:name.trim(),
+    id, name:name.trim(), userId:uid,
     createdAt:new Date().toLocaleDateString('zh-CN'),
     updatedAt:new Date().toLocaleDateString('zh-CN'),
     deleted:false,
@@ -1775,6 +1945,9 @@ function backToDashboard(){
 }
 
 function renderDashboard(){
+  const sess=getSession();
+  const sub=document.querySelector('.dash-subtitle');
+  if(sub) sub.textContent=sess?`当前用户：${sess.username} · 数据本地存储，永久保留`:'所有项目数据本地保存，永久保留';
   const active=getProjects(false);
   const archived=getProjects(true).filter(p=>p.deleted);
   const grid=$('projGrid');
@@ -1843,13 +2016,20 @@ function init(){
 // ── Startup ──
 (function startup(){
   init(); // prefill D defaults
-  // Show dashboard or editor
   $('appBody').style.display='none';
   $('btnBack').style.display='none';
   ['btnPreview','btnExport','btnPrint'].forEach(b=>$(b).style.display='none');
   $('hdrInfo').style.display='none';
-  $('dashboard').style.display='block';
-  renderDashboard();
+  $('dashboard').style.display='none';
+  $('userBadge').style.display='none';
+  $('btnLogout').style.display='none';
+  // 检查登录状态
+  const sess=getSession();
+  if(sess){
+    showApp();  // 已登录 → 直接进项目列表
+  } else {
+    $('authScreen').style.display='flex';  // 未登录 → 显示登录页
+  }
 })();
 </script>
 </body>
