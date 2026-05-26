@@ -130,6 +130,34 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
   background:#F9FDFB;border:1px solid #E0EAE5;border-top:none;
   border-radius:0 0 3px 3px;flex-shrink:0;}
 
+/* ── Draggable / Resizable Image Overlay ── */
+.dimg{position:absolute;cursor:move;user-select:none;z-index:20;
+  border-radius:4px;border:1.5px solid #B8DECA;overflow:visible;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);}
+.dimg:hover{border-color:#007A3E;box-shadow:0 3px 14px rgba(0,122,62,.22);}
+.dimg.dimg-active{border-color:#007A3E;box-shadow:0 4px 20px rgba(0,122,62,.32);opacity:.94;}
+.dimg img{width:100%;height:100%;object-fit:contain;display:block;
+  border-radius:3px;pointer-events:none;background:#fff;}
+.dimg-ph{position:absolute;cursor:default;z-index:18;
+  background:#F5FAF7;border:1.5px dashed #C0DDD0;border-radius:4px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:#A8C8B8;font-size:10px;gap:5px;pointer-events:none;}
+.dimg-cap{position:absolute;bottom:-18px;left:0;right:0;text-align:center;
+  font-size:8px;color:#8C8C8C;white-space:nowrap;pointer-events:none;}
+/* Resize handles — 8-point */
+.rh{position:absolute;width:10px;height:10px;background:#007A3E;
+  border:1.5px solid #fff;border-radius:2px;z-index:21;
+  opacity:0;transition:opacity .15s;box-shadow:0 1px 3px rgba(0,0,0,.25);}
+.dimg:hover .rh,.dimg.dimg-active .rh{opacity:1;}
+.rh-nw{top:-5px;left:-5px;cursor:nw-resize;}
+.rh-ne{top:-5px;right:-5px;cursor:ne-resize;}
+.rh-sw{bottom:-5px;left:-5px;cursor:sw-resize;}
+.rh-se{bottom:-5px;right:-5px;cursor:se-resize;}
+.rh-n{top:-5px;left:calc(50% - 5px);cursor:n-resize;}
+.rh-s{bottom:-5px;left:calc(50% - 5px);cursor:s-resize;}
+.rh-e{right:-5px;top:calc(50% - 5px);cursor:e-resize;}
+.rh-w{left:-5px;top:calc(50% - 5px);cursor:w-resize;}
+
 /* Cooperation steps */
 .coop-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;}
 .step-num{min-width:20px;height:20px;border-radius:50%;background:#007A3E;color:#fff;
@@ -543,6 +571,7 @@ const D = {
     issues:[{problem:'',measure:''}],
     urgency:''
   },
+  imagePos:{},   // {imgKey:{x,y,w,h}} in % of .sl-body dimensions
   s12:{
     items:[
       {label:'现货收益', amount:'', notes:'', deduct:false},
@@ -606,6 +635,74 @@ function calcCostTotal(){
 }
 function escAttr(s){return String(s||'').replace(/"/g,'&quot;');}
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── slide shell ──
+// ══════════════════════════════════════════════
+//  DRAGGABLE / RESIZABLE IMAGE SYSTEM
+// ══════════════════════════════════════════════
+function getImgPos(key,dX,dY,dW,dH){
+  return (D.imagePos&&D.imagePos[key]) ? D.imagePos[key] : {x:dX,y:dY,w:dW,h:dH};
+}
+const RH_DIRS=['nw','ne','sw','se','n','s','e','w'];
+function draggableImg(key,url,dX,dY,dW,dH,caption){
+  const p=getImgPos(key,dX,dY,dW,dH);
+  const style=`left:${p.x}%;top:${p.y}%;width:${p.w}%;height:${p.h}%;`;
+  const rhHtml=RH_DIRS.map(d=>`<div class="rh rh-${d}" data-dir="${d}"></div>`).join('');
+  if(!url){
+    return `<div class="dimg-ph" id="dimg_${key}" style="${style}">
+      <span style="font-size:22px">⚡</span><span>${caption}</span>
+      <div class="dimg-cap">${caption}</div>
+    </div>`;
+  }
+  return `<div class="dimg" id="dimg_${key}"
+    data-key="${key}" data-dx="${dX}" data-dy="${dY}" data-dw="${dW}" data-dh="${dH}"
+    style="${style}">${rhHtml}
+    <img src="${url}" alt="${caption}" draggable="false">
+    <div class="dimg-cap">${caption}</div>
+  </div>`;
+}
+
+// Drag/resize state
+let _ds=null;
+function initImgDrag(){
+  const canvas=$('slideCanvas');
+  canvas.addEventListener('mousedown',function(e){
+    const rh=e.target.closest('.rh');
+    const el=e.target.closest('.dimg');
+    if(!el) return;
+    const body=el.closest('.sl-body');
+    if(!body) return;
+    const br=body.getBoundingClientRect();
+    const key=el.dataset.key;
+    const p=getImgPos(key,
+      parseFloat(el.dataset.dx),parseFloat(el.dataset.dy),
+      parseFloat(el.dataset.dw),parseFloat(el.dataset.dh));
+    _ds={key,br,el,mx:e.clientX,my:e.clientY,p0:{...p},dir:rh?rh.dataset.dir:'move'};
+    el.classList.add('dimg-active');
+    e.preventDefault();e.stopPropagation();
+  });
+  document.addEventListener('mousemove',function(e){
+    if(!_ds) return;
+    const {key,br,el,mx,my,p0,dir}=_ds;
+    const dx=(e.clientX-mx)/br.width*100, dy=(e.clientY-my)/br.height*100;
+    let {x,y,w,h}=p0, min=4;
+    if(dir==='move'){
+      x=Math.max(-2,Math.min(94,x+dx));
+      y=Math.max(-2,Math.min(92,y+dy));
+    } else {
+      if(dir.includes('e')) w=Math.max(min,p0.w+dx);
+      if(dir.includes('s')) h=Math.max(min,p0.h+dy);
+      if(dir.includes('w')){const nw=Math.max(min,p0.w-dx);x=p0.x+(p0.w-nw);w=nw;}
+      if(dir.includes('n')){const nh=Math.max(min,p0.h-dy);y=p0.y+(p0.h-nh);h=nh;}
+    }
+    el.style.cssText=`left:${x}%;top:${y}%;width:${w}%;height:${h}%;`;
+    if(!D.imagePos)D.imagePos={};
+    D.imagePos[key]={x,y,w,h};
+  });
+  document.addEventListener('mouseup',function(){
+    if(_ds){_ds.el.classList.remove('dimg-active');_ds=null;saveCurrentProject();}
+  });
+}
 
 // ── slide shell ──
 function shell(num,title,body){
@@ -927,60 +1024,51 @@ function renderS3(){
       ${photoStrip}
     </div>
 
-    <!-- RIGHT: satellite / map image -->
-    <div style="position:relative;border-radius:4px;overflow:hidden;border:1.5px solid #D6EBE1;height:100%;">
-      ${d.mapUrl
-        ?`<img src="${d.mapUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`
-        :`<div class="img-ph" style="position:absolute;inset:0;border-radius:3px;border:none;">
-           <span style="font-size:32px;">🗺️</span>
-           <span style="font-size:10px;">区位图 / 卫星地图</span>
-         </div>`}
+    <!-- RIGHT: placeholder space (map now floats freely) -->
+    <div style="border-radius:4px;border:1px dashed #E0EAE5;height:100%;
+      display:flex;align-items:center;justify-content:center;">
+      <span style="font-size:10px;color:#C8DDD3;font-style:italic;">
+        ${d.mapUrl?'区位图已上传，可拖动调整位置':'上传区位图后可自由拖放'}
+      </span>
     </div>
-
-  </div>`);
+  </div>
+  ${draggableImg('s3_map',d.mapUrl, 43,2,55,90,'区位图 / 卫星地图')}`);
 }
 
 function renderS4(){
   const d=D.s4;
+  const notes=(d.noteItems&&d.noteItems.length)
+    ?d.noteItems.filter(it=>it.title||it.content):[];
+  const noteColors=[
+    {border:'#B8DECA',bg:'#F2FAF5',tc:'#005A2D'},
+    {border:'#F5A623',bg:'#FFFBF0',tc:'#8B6000'},
+    {border:'#1E90FF',bg:'#F0F7FF',tc:'#003399'},
+    {border:'#B39DDB',bg:'#F5F0FF',tc:'#4527A0'},
+    {border:'#80CBC4',bg:'#E0F7FA',tc:'#006064'}
+  ];
   return shell('四','电力接入与周边场站情况',`
+  <!-- 固定内容区：左侧参数表 + 右侧说明 -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;height:calc(100% - 8px);">
-    <!-- LEFT col: table + diagram -->
     <div style="display:flex;flex-direction:column;gap:7px;">
       <table class="tbl" style="font-size:10px;">
         <tr><td class="lc">接入变电站</td><td class="vc">${v(d.substationName)}</td></tr>
         <tr><td class="lc">电压等级</td><td class="vc">${v(d.voltageLevel)}</td></tr>
         <tr><td class="lc">线路距离</td><td class="vc">
-          ${d.totalDistance?`<b>${d.totalDistance} km</b> 合计`:('—')}
+          ${d.totalDistance?`<b>${d.totalDistance} km</b> 合计`:'—'}
           ${(d.aerialLength||d.undergroundLength)?`<span style="font-size:9px;color:#888;margin-left:4px;">（架空 ${d.aerialLength||0} km · 地埋 ${d.undergroundLength||0} km）</span>`:''}
         </td></tr>
       </table>
-      <div class="img-wrap" style="flex:1;min-height:0;">
-        <div class="img-ph" style="height:130px;">
-          ${d.diagramUrl?`<img src="${d.diagramUrl}" alt="接入系统图">`
-            :`<span style="font-size:22px">⚡</span><span>电网接入示意图</span>`}
-        </div>
-        <div class="img-cap">电网接入系统图</div>
-      </div>
     </div>
-    <!-- RIGHT col: notes + map -->
-    <div style="display:flex;flex-direction:column;gap:7px;">
-      ${(d.noteItems&&d.noteItems.length)?d.noteItems.filter(it=>it.title||it.content).map((it,idx)=>{
-        const colors=[
-          {border:'#B8DECA',bg:'#F2FAF5',tc:'#005A2D'},
-          {border:'#F5A623',bg:'#FFFBF0',tc:'#8B6000'},
-          {border:'#1E90FF',bg:'#F0F7FF',tc:'#003399'},
-          {border:'#B39DDB',bg:'#F5F0FF',tc:'#4527A0'},
-          {border:'#80CBC4',bg:'#E0F7FA',tc:'#006064'}
-        ];
-        const c=colors[idx%colors.length];
-        return `<div class="policy-block" style="border-color:${c.border};background:${c.bg};"><div class="policy-title" style="color:${c.tc};">${it.title||'说明'}</div><div class="policy-content">${it.content}</div></div>`;
+    <div style="display:flex;flex-direction:column;gap:7px;overflow:auto;">
+      ${notes.length?notes.map((it,idx)=>{
+        const c=noteColors[idx%noteColors.length];
+        return `<div class="policy-block" style="border-color:${c.border};background:${c.bg};flex-shrink:0;"><div class="policy-title" style="color:${c.tc};">${it.title||'说明'}</div><div class="policy-content">${it.content}</div></div>`;
       }).join(''):`<div style="color:#C0C0C0;font-size:10px;text-align:center;padding:16px;font-style:italic;">请填写接入情况说明</div>`}
-      ${d.mapUrl2?`<div class="img-wrap" style="flex:1;min-height:0;">
-        <div class="img-ph" style="height:80px;"><img src="${d.mapUrl2}" alt="接入地图"></div>
-        <div class="img-cap">接入区域地图</div>
-      </div>`:''}
     </div>
-  </div>`);
+  </div>
+  <!-- 可拖拽图片（自由定位，拖动调整位置和大小） -->
+  ${draggableImg('s4_diagram',d.diagramUrl, 2,35,44,55,'电网接入系统图')}
+  ${d.mapUrl2?draggableImg('s4_map',d.mapUrl2, 51,55,45,36,'接入区域地图'):''}`);
 }
 
 function renderS5(){
@@ -1809,6 +1897,11 @@ function getEmbedStyles(){
     .img-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;border-radius:2px;}
     .img-wrap{display:flex;flex-direction:column;gap:0;}
     .img-cap{font-size:8px;color:#8C8C8C;text-align:center;padding:2px 0;background:#F9FDFB;border:1px solid #E0EAE5;border-top:none;border-radius:0 0 3px 3px;}
+    .dimg{position:absolute;border-radius:4px;border:1px solid #B8DECA;overflow:visible;}
+    .dimg img{width:100%;height:100%;object-fit:contain;display:block;border-radius:3px;background:#fff;}
+    .dimg-ph{position:absolute;background:#F5FAF7;border:1.5px dashed #C0DDD0;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#A8C8B8;font-size:10px;gap:5px;}
+    .dimg-cap{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:8px;color:#8C8C8C;}
+    .rh{display:none;}
     .coop-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;}
     .step-num{min-width:20px;height:20px;border-radius:50%;background:#007A3E;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
     .step-text{font-size:10px;color:#333;line-height:1.5;}
@@ -2180,6 +2273,7 @@ function init(){
 // ── Startup ──
 (function startup(){
   init(); // prefill D defaults
+  initImgDrag(); // enable drag/resize on slide images
   $('appBody').style.display='none';
   $('btnBack').style.display='none';
   ['btnPreview','btnExport','btnPrint'].forEach(b=>$(b).style.display='none');
