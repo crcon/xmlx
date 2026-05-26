@@ -408,7 +408,11 @@ const D = {
   s4:{
     substationName:'',voltageLevel:'220kV',totalDistance:'',
     aerialLength:'',undergroundLength:'',
-    connectionNotes:'',surroundingDesc:'',powerDemand:'',
+    noteItems:[
+      {title:'接入注意事项',content:''},
+      {title:'周边场站情况',content:''},
+      {title:'区域电力需求',content:''}
+    ],
     diagramUrl:'',mapUrl2:''
   },
   s5:{
@@ -827,10 +831,17 @@ function renderS4(){
     </div>
     <!-- RIGHT col: notes + map -->
     <div style="display:flex;flex-direction:column;gap:7px;">
-      ${d.connectionNotes?`<div class="policy-block"><div class="policy-title">接入注意事项</div><div class="policy-content">${d.connectionNotes}</div></div>`:''}
-      ${d.surroundingDesc?`<div class="policy-block" style="border-color:#F5A623;background:#FFFBF0;"><div class="policy-title" style="color:#8B6000;">周边场站情况</div><div class="policy-content">${d.surroundingDesc}</div></div>`:''}
-      ${d.powerDemand?`<div class="policy-block" style="border-color:#1E90FF;background:#F0F7FF;"><div class="policy-title" style="color:#003399;">电力需求</div><div class="policy-content">${d.powerDemand}</div></div>`:''}
-      ${!d.connectionNotes&&!d.surroundingDesc&&!d.powerDemand?`<div style="color:#C0C0C0;font-size:10px;text-align:center;padding:16px;font-style:italic;">请填写接入情况说明</div>`:''}
+      ${(d.noteItems&&d.noteItems.length)?d.noteItems.filter(it=>it.title||it.content).map((it,idx)=>{
+        const colors=[
+          {border:'#B8DECA',bg:'#F2FAF5',tc:'#005A2D'},
+          {border:'#F5A623',bg:'#FFFBF0',tc:'#8B6000'},
+          {border:'#1E90FF',bg:'#F0F7FF',tc:'#003399'},
+          {border:'#B39DDB',bg:'#F5F0FF',tc:'#4527A0'},
+          {border:'#80CBC4',bg:'#E0F7FA',tc:'#006064'}
+        ];
+        const c=colors[idx%colors.length];
+        return `<div class="policy-block" style="border-color:${c.border};background:${c.bg};"><div class="policy-title" style="color:${c.tc};">${it.title||'说明'}</div><div class="policy-content">${it.content}</div></div>`;
+      }).join(''):`<div style="color:#C0C0C0;font-size:10px;text-align:center;padding:16px;font-style:italic;">请填写接入情况说明</div>`}
       ${d.mapUrl2?`<div class="img-wrap" style="flex:1;min-height:0;">
         <div class="img-ph" style="height:80px;"><img src="${d.mapUrl2}" alt="接入地图"></div>
         <div class="img-cap">接入区域地图</div>
@@ -1061,24 +1072,28 @@ function renderS10(){
 
 function renderS11(){
   const d=D.s11;
-  const issues=d.issues.filter(i=>i.problem||i.measure);
+  // support both old {problem,measure} and new {title,content} structures
+  const issues=d.issues.filter(i=>i.title||i.content||i.problem||i.measure);
   return shell('七','存在的问题及应对措施',`
-  <div style="height:calc(100% - 8px);">
-    <table class="tbl" style="font-size:10px;margin-bottom:10px;">
-      <thead>
-        <tr><th style="width:10%;">序号</th><th style="width:40%;">存在的问题</th><th style="width:50%;">应对措施</th></tr>
-      </thead>
-      <tbody>
-        ${issues.length?issues.map((iss,i)=>`
-          <tr>
-            <td class="vc" style="text-align:center;">${i+1}</td>
-            <td class="vc">${iss.problem||'—'}</td>
-            <td class="vc">${iss.measure||'—'}</td>
-          </tr>`).join('')
-        :`<tr><td colspan="3" style="text-align:center;color:#C0C0C0;font-style:italic;padding:18px;">请填写存在的问题</td></tr>`}
-      </tbody>
-    </table>
-    ${d.urgency?`<div class="policy-block" style="border-color:#F5A623;background:#FFFBF0;">
+  <div style="height:calc(100% - 8px);overflow:auto;">
+    ${issues.length?issues.map((iss,i)=>{
+      const title=iss.title||(iss.problem?'存在的问题':'');
+      const content=iss.content||iss.measure||'';
+      const colors=[
+        {border:'#F5A623',bg:'#FFFBF0',tc:'#8B6000'},
+        {border:'#E57373',bg:'#FFF5F5',tc:'#B71C1C'},
+        {border:'#1E90FF',bg:'#F0F7FF',tc:'#003399'},
+        {border:'#B39DDB',bg:'#F5F0FF',tc:'#4527A0'},
+        {border:'#80CBC4',bg:'#E0F7FA',tc:'#006064'}
+      ];
+      const c=colors[i%colors.length];
+      return `<div class="policy-block" style="border-color:${c.border};background:${c.bg};margin-bottom:7px;">
+        <div class="policy-title" style="color:${c.tc};">【${i+1}】${title||'条目'}</div>
+        <div class="policy-content">${content||'—'}</div>
+      </div>`;
+    }).join('')
+    :`<div style="color:#C0C0C0;font-size:10px;text-align:center;padding:24px;font-style:italic;">请填写存在的问题及应对措施</div>`}
+    ${d.urgency?`<div class="policy-block" style="border-color:#F5A623;background:#FFFBF0;margin-top:6px;">
       <div class="policy-title" style="color:#8B6000;">⚠ 需要解决及明确的问题</div>
       <div class="policy-content">${d.urgency}</div>
     </div>`:''}
@@ -1254,13 +1269,15 @@ function renderF4(){
     <div>外线距离：<b>${s4.totalDistance||'—'}</b> km（架空 ${s4.aerialLength||'—'} km · 地埋 ${s4.undergroundLength||'—'} km）</div>
     <div style="margin-top:4px;font-size:10px;color:#888;">如需修改，请在左侧导航切换至「基本情况」页面填写。</div>
   </div>`;
+  const noteItemsHtml=(D.s4.noteItems||[]).map((it,i)=>`
+  <div class="dyn-row">
+    <div class="dyn-row-hdr"><span class="dyn-row-lbl">说明 ${i+1}</span><button class="del-btn" onclick="delNoteItem(${i})">✕</button></div>
+    ${fg('标题',`<input class="fi" placeholder="如：接入注意事项" value="${escAttr(it.title)}" oninput="D.s4.noteItems[${i}].title=this.value;refresh()">`)}
+    ${fg('内容',`<textarea class="fi ta sm" style="min-height:54px" placeholder="填写说明内容..." oninput="D.s4.noteItems[${i}].content=this.value;refresh()">${escHtml(it.content)}</textarea>`)}
+  </div>`).join('');
   return `<div class="fp-hdr">四、电力接入情况</div>
   ${sec('接入技术参数', syncInfo)}
-  ${sec('接入说明',
-    fg('接入注意事项',ta('connectionNotes','s4','跨越线路、施工注意事项等...',3)) +
-    fg('周边场站情况',ta('surroundingDesc','s4','周边光伏、风电、其他储能情况...',3)) +
-    fg('区域电力需求',ta('powerDemand','s4','区域用电量、工业用电等...',2))
-  )}
+  ${sec('接入说明', noteItemsHtml + `<button class="add-btn" onclick="addNoteItem()">+ 添加说明条目</button>`)}
   ${sec('图片附件',
     uploadFG('接入系统图','s4','diagram') +
     uploadFG('接入区域地图','s4','mapUrl2')
@@ -1416,16 +1433,17 @@ function renderF10(){
 
 function renderF11(){
   return `<div class="fp-hdr">七、存在的问题及应对措施</div>
-  ${D.s11.issues.map((iss,i)=>`
-  <div class="fp-sec">
-    <div class="dyn-row-hdr" style="margin-bottom:8px;">
-      <div class="fp-sec-title">问题 ${i+1}</div>
-      <button class="del-btn" onclick="delIssue(${i})">✕</button>
-    </div>
-    ${fg('存在的问题',`<textarea class="fi ta sm" style="min-height:44px" placeholder="问题描述..." oninput="D.s11.issues[${i}].problem=this.value;refresh()">${escHtml(iss.problem)}</textarea>`)}
-    ${fg('应对措施',`<textarea class="fi ta sm" style="min-height:44px" placeholder="应对措施..." oninput="D.s11.issues[${i}].measure=this.value;refresh()">${escHtml(iss.measure)}</textarea>`)}
-  </div>`).join('')}
-  <div style="padding:10px 14px;"><button class="add-btn" onclick="addIssue()">+ 添加问题条目</button></div>
+  ${D.s11.issues.map((iss,i)=>{
+    // support both old {problem,measure} and new {title,content}
+    const titleVal=iss.title!==undefined?iss.title:(iss.problem||'');
+    const contentVal=iss.content!==undefined?iss.content:(iss.measure||'');
+    return `
+  <div class="dyn-row">
+    <div class="dyn-row-hdr"><span class="dyn-row-lbl">条目 ${i+1}</span><button class="del-btn" onclick="delIssue(${i})">✕</button></div>
+    ${fg('标题',`<input class="fi" placeholder="如：存在的问题、应对措施..." value="${escAttr(titleVal)}" oninput="D.s11.issues[${i}].title=this.value;D.s11.issues[${i}].problem=this.value;refresh()">`)}
+    ${fg('内容',`<textarea class="fi ta sm" style="min-height:54px" placeholder="详细描述..." oninput="D.s11.issues[${i}].content=this.value;D.s11.issues[${i}].measure=this.value;refresh()">${escHtml(contentVal)}</textarea>`)}
+  </div>`;}).join('')}
+  <div style="padding:10px 14px;"><button class="add-btn" onclick="addIssue()">+ 添加条目</button></div>
   ${sec('需决策事项',fg('需明确/决策的紧急事项',ta('urgency','s11','如：该项目参与竞企较多，需我司尽快决策...',3)))}`;
 }
 
@@ -1457,7 +1475,9 @@ function addStep(){D.s8.steps.push('');refreshForm();refresh();}
 function delStep(i){D.s8.steps.splice(i,1);refreshForm();refresh();}
 function addCostRow(){D.s9.rows.push({seq:String(D.s9.rows.length+1),name:'',scale:'',amount:''});refreshForm();refresh();}
 function delCostRow(i){D.s9.rows.splice(i,1);refreshForm();refresh();}
-function addIssue(){D.s11.issues.push({problem:'',measure:''});refreshForm();refresh();}
+function addNoteItem(){if(!D.s4.noteItems)D.s4.noteItems=[];D.s4.noteItems.push({title:'',content:''});refreshForm();refresh();}
+function delNoteItem(i){D.s4.noteItems.splice(i,1);refreshForm();refresh();}
+function addIssue(){D.s11.issues.push({title:'',content:'',problem:'',measure:''});refreshForm();refresh();}
 function delIssue(i){D.s11.issues.splice(i,1);refreshForm();refresh();}
 
 function trigUpload(sk,fk){document.getElementById('upf_'+sk+'_'+fk).click();}
