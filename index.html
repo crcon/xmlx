@@ -1250,13 +1250,13 @@ function renderS12(){
     const amt=parseFloat(it.amount)||0;
     const hasVal=it.amount!=='';
     return `<tr style="${it.deduct?'background:#FFF8F8;':''}">
-      <td class="vc" style="font-size:9.5px;font-weight:${it.deduct?'600':'400'};color:${it.deduct?'#C62828':'#333'};padding:5px 8px;">
-        ${it.deduct?'':''}${it.label}${it.deduct?' <span style="font-size:8px;background:#FFEBEE;color:#C62828;border-radius:2px;padding:1px 3px;">扣减</span>':''}
+      <td class="vc" style="white-space:nowrap;font-size:9.5px;font-weight:${it.deduct?'600':'400'};color:${it.deduct?'#C62828':'#333'};padding:5px 10px;">
+        ${it.label}${it.deduct?' <span style="font-size:8px;background:#FFEBEE;color:#C62828;border-radius:2px;padding:1px 4px;margin-left:4px;">扣减</span>':''}
       </td>
-      <td class="vc" style="text-align:right;font-size:10px;font-weight:600;padding:5px 8px;color:${it.deduct?'#C62828':'#222'};">
+      <td class="vc" style="white-space:nowrap;text-align:right;font-size:10px;font-weight:600;padding:5px 14px;color:${it.deduct?'#C62828':'#222'};">
         ${hasVal?(it.deduct?'− ':'+ ')+Math.abs(amt).toFixed(2):'—'}
       </td>
-      <td class="vc" style="font-size:8.5px;color:#777;padding:5px 8px;">${it.notes||'—'}</td>
+      <td class="vc" style="font-size:8.5px;color:#777;padding:5px 10px;">${it.notes||''}</td>
     </tr>`;
   }).join('');
 
@@ -1273,28 +1273,28 @@ function renderS12(){
       </div>
       <div style="text-align:right;">
         <div style="font-size:8px;color:rgba(255,255,255,.5);margin-bottom:4px;">= 各项收益之和 − 容量电费</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.7);">
+        <div style="font-size:10px;color:rgba(255,255,255,.7);white-space:nowrap;">
           ${items.filter(it=>!it.deduct&&it.amount).map(it=>`+${parseFloat(it.amount).toFixed(2)}`).join(' ')}
           ${items.filter(it=>it.deduct&&it.amount).map(it=>` − ${parseFloat(it.amount).toFixed(2)}`).join('')}
         </div>
       </div>
     </div>
-    <!-- 明细表 -->
+    <!-- 明细表：table-layout:auto 让列宽自适应内容 -->
     <div style="flex:1;overflow:auto;">
-      <table class="tbl" style="font-size:10px;">
+      <table class="tbl" style="font-size:10px;table-layout:auto;width:auto;min-width:100%;">
         <thead>
           <tr>
-            <th style="width:30%;">收益项目</th>
-            <th style="width:22%;text-align:right;">金额（万元/年）</th>
-            <th style="width:48%;">备注说明</th>
+            <th style="white-space:nowrap;">收益项目</th>
+            <th style="white-space:nowrap;text-align:right;">金额（万元/年）</th>
+            <th>备注说明</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
         <tfoot>
           <tr style="background:#F2FAF5;">
-            <td style="font-weight:700;font-size:10px;padding:6px 8px;color:#005A2D;">合计</td>
-            <td style="font-weight:800;font-size:11px;text-align:right;padding:6px 8px;color:${totalColor};">${totalStr}</td>
-            <td style="padding:6px 8px;font-size:8.5px;color:#999;">万元/年</td>
+            <td style="white-space:nowrap;font-weight:700;font-size:10px;padding:6px 10px;color:#005A2D;">合计</td>
+            <td style="white-space:nowrap;font-weight:800;font-size:11px;text-align:right;padding:6px 14px;color:${totalColor};">${totalStr}</td>
+            <td style="padding:6px 10px;font-size:8.5px;color:#999;">万元/年</td>
           </tr>
         </tfoot>
       </table>
