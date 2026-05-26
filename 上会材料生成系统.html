@@ -247,6 +247,41 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
 ::-webkit-scrollbar-track{background:#F0F4F1;}
 ::-webkit-scrollbar-thumb{background:#B8DECA;border-radius:3px;}
 ::-webkit-scrollbar-thumb:hover{background:#007A3E;}
+/* ========== PROJECT DASHBOARD ========== */
+#dashboard{display:none;flex:1;overflow-y:auto;padding:32px 40px;background:#F0F4F1;}
+.dash-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
+.dash-title{font-size:20px;font-weight:700;color:#004E28;}
+.dash-subtitle{font-size:12px;color:#7A9E8C;margin-top:2px;}
+.dash-new-btn{background:#007A3E;color:#fff;border:none;border-radius:6px;
+  padding:10px 22px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;
+  transition:background .15s;}
+.dash-new-btn:hover{background:#005A2D;}
+.proj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+.proj-card{background:#fff;border:1.5px solid #D6EBE1;border-radius:8px;padding:18px 18px 14px;
+  transition:box-shadow .15s,border-color .15s;position:relative;overflow:hidden;}
+.proj-card:not(.proj-card-archived):hover{box-shadow:0 4px 16px rgba(0,122,62,.12);border-color:#007A3E;}
+.proj-card-accent{position:absolute;left:0;top:0;bottom:0;width:4px;background:#007A3E;border-radius:4px 0 0 4px;}
+.proj-card-name{font-size:14px;font-weight:700;color:#004E28;margin-bottom:4px;padding-left:6px;line-height:1.4;}
+.proj-card-cap{font-size:11px;color:#007A3E;font-weight:600;padding-left:6px;margin-bottom:6px;}
+.proj-card-meta{font-size:10px;color:#9AB;padding-left:6px;margin-bottom:12px;}
+.proj-card-actions{display:flex;gap:6px;padding-left:4px;}
+.proj-btn{border:1px solid #D6EBE1;border-radius:4px;padding:4px 10px;font-size:11px;
+  cursor:pointer;background:#fff;color:#555;transition:all .12s;}
+.proj-btn:hover{background:#EAF5EE;border-color:#007A3E;color:#007A3E;}
+.proj-btn-open{background:#007A3E;color:#fff;border-color:#007A3E;}
+.proj-btn-open:hover{background:#005A2D;}
+.proj-btn-arch{color:#E87722;border-color:#F5D5B0;}
+.proj-btn-arch:hover{background:#FFF7EE;border-color:#E87722;}
+.proj-btn-restore{color:#007A3E;border-color:#B8DECA;}
+.proj-empty{text-align:center;padding:60px 20px;color:#B0C8BC;}
+.proj-empty-icon{font-size:48px;margin-bottom:12px;}
+.proj-arch-section{margin-top:28px;border-top:1px dashed #D6EBE1;padding-top:16px;}
+.proj-arch-title{font-size:11px;color:#9AB;margin-bottom:12px;cursor:pointer;user-select:none;}
+.proj-card-archived{opacity:.6;border-style:dashed;}
+.proj-card-archived .proj-card-accent{background:#B0C8BC;}
+.btn-back{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);
+  border-radius:4px;padding:5px 12px;font-size:11px;cursor:pointer;display:none;}
+.btn-back:hover{background:rgba(255,255,255,.25);}
 </style>
 </head>
 <body>
@@ -261,14 +296,31 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
     </div>
   </div>
   <div class="hdr-actions">
+    <button class="btn-back" id="btnBack" onclick="backToDashboard()">← 项目列表</button>
     <span class="hdr-slide-info" id="hdrInfo"></span>
-    <button class="btn btn-ghost btn-sm" onclick="previewAll()">👁 全屏预览</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportHTML()">📋 生成报告</button>
-    <button class="btn btn-ghost btn-sm" onclick="printAll()">🖨 打印/导出</button>
+    <button class="btn btn-ghost btn-sm" id="btnPreview" onclick="previewAll()">👁 全屏预览</button>
+    <button class="btn btn-ghost btn-sm" id="btnExport" onclick="exportHTML()">📋 生成报告</button>
+    <button class="btn btn-ghost btn-sm" id="btnPrint" onclick="printAll()">🖨 打印/导出</button>
   </div>
 </header>
 
-<div class="app-body">
+<!-- PROJECT DASHBOARD -->
+<div id="dashboard">
+  <div class="dash-topbar">
+    <div>
+      <div class="dash-title">📂 项目管理</div>
+      <div class="dash-subtitle">所有项目数据本地保存，永久保留</div>
+    </div>
+    <button class="dash-new-btn" onclick="createNewProject()">＋ 新建项目</button>
+  </div>
+  <div class="proj-grid" id="projGrid"></div>
+  <div class="proj-arch-section" id="archSection" style="display:none;">
+    <div class="proj-arch-title" onclick="toggleArchived()">▼ 已归档项目（点击展开）</div>
+    <div class="proj-grid" id="archGrid" style="display:none;margin-top:8px;"></div>
+  </div>
+</div>
+
+<div class="app-body" id="appBody">
 
 <!-- SIDEBAR -->
 <aside class="sidebar">
@@ -1386,7 +1438,11 @@ function renderForm(idx){
 //  DATA MUTATIONS
 // ══════════════════════════════════════════════
 function upd(sk,k,val){D[sk][k]=val;refresh();}
-function refresh(){$('slideCanvas').innerHTML=renderSlide(curIdx);updateProgress();}
+function refresh(){
+  $('slideCanvas').innerHTML=renderSlide(curIdx);
+  updateProgress();
+  saveCurrentProject();  // auto-save on every change
+}
 function refreshForm(){$('formPanel').innerHTML=renderForm(curIdx);}
 
 function addPolicy(){D.s2.policies.push({title:'',content:''});refreshForm();refresh();}
@@ -1545,6 +1601,152 @@ function printAll(){
 function exportHTML(){printAll();}
 
 // ══════════════════════════════════════════════
+//  PROJECT MANAGEMENT (localStorage)
+// ══════════════════════════════════════════════
+const PM_KEY='yichu_projects';
+let currentProjectId=null;
+
+function pmLoad(){return JSON.parse(localStorage.getItem(PM_KEY)||'{"projects":[]}');}
+function pmSave(store){localStorage.setItem(PM_KEY,JSON.stringify(store));}
+
+function getProjects(includeArchived=false){
+  return pmLoad().projects.filter(p=>includeArchived||!p.deleted);
+}
+
+// Deep clone D as default data for new project
+function defaultData(){return JSON.parse(JSON.stringify(D));}
+
+function createNewProject(){
+  const name=prompt('请输入项目名称：','新储能项目');
+  if(!name||!name.trim()) return;
+  const store=pmLoad();
+  const id='p_'+Date.now();
+  store.projects.unshift({
+    id, name:name.trim(),
+    createdAt:new Date().toLocaleDateString('zh-CN'),
+    updatedAt:new Date().toLocaleDateString('zh-CN'),
+    deleted:false,
+    data:defaultData()
+  });
+  pmSave(store);
+  openProject(id);
+}
+
+function openProject(id){
+  const store=pmLoad();
+  const proj=store.projects.find(p=>p.id===id);
+  if(!proj) return;
+  currentProjectId=id;
+  // Load project data into D
+  Object.keys(D).forEach(k=>{if(proj.data[k])Object.assign(D[k],proj.data[k]);});
+  // Switch to editor view
+  $('dashboard').style.display='none';
+  $('appBody').style.display='flex';
+  $('btnBack').style.display='inline-block';
+  ['btnPreview','btnExport','btnPrint'].forEach(b=>$(b).style.display='');
+  $('hdrInfo').style.display='';
+  goTo(0); refresh(); refreshForm(); updateProgress();
+}
+
+function saveCurrentProject(){
+  if(!currentProjectId) return;
+  const store=pmLoad();
+  const idx=store.projects.findIndex(p=>p.id===currentProjectId);
+  if(idx===-1) return;
+  store.projects[idx].data=JSON.parse(JSON.stringify(D));
+  store.projects[idx].updatedAt=new Date().toLocaleDateString('zh-CN');
+  // auto-update name if project name matches placeholder
+  const projName=D.s1&&D.s1.address?'':store.projects[idx].name;
+  if(D.s0&&D.s0.projectName&&D.s0.projectName!==store.projects[idx].name){
+    // keep user-set project name unless it's a new placeholder
+  }
+  pmSave(store);
+}
+
+function archiveProject(id,e){
+  e&&e.stopPropagation();
+  if(!confirm('归档后项目将移至已归档区，数据永久保留，可随时恢复。确认归档？')) return;
+  const store=pmLoad();
+  const p=store.projects.find(q=>q.id===id);
+  if(p) p.deleted=true;
+  pmSave(store);
+  renderDashboard();
+}
+
+function restoreProject(id,e){
+  e&&e.stopPropagation();
+  const store=pmLoad();
+  const p=store.projects.find(q=>q.id===id);
+  if(p) p.deleted=false;
+  pmSave(store);
+  renderDashboard();
+}
+
+function renameProject(id,e){
+  e&&e.stopPropagation();
+  const store=pmLoad();
+  const p=store.projects.find(q=>q.id===id);
+  if(!p) return;
+  const name=prompt('修改项目名称：',p.name);
+  if(name&&name.trim()){p.name=name.trim();pmSave(store);renderDashboard();}
+}
+
+function backToDashboard(){
+  saveCurrentProject();
+  currentProjectId=null;
+  $('appBody').style.display='none';
+  $('dashboard').style.display='block';
+  $('btnBack').style.display='none';
+  ['btnPreview','btnExport','btnPrint'].forEach(b=>$(b).style.display='none');
+  $('hdrInfo').style.display='none';
+  renderDashboard();
+}
+
+function renderDashboard(){
+  const active=getProjects(false);
+  const archived=getProjects(true).filter(p=>p.deleted);
+  const grid=$('projGrid');
+  const cap=p=>{
+    const d=p.data&&p.data.s1;
+    return d&&d.powerMW?`${d.powerMW}MW / ${d.capacityMWh||'—'}MWh`:'规模待填写';
+  };
+  const cardHtml=(p,isArch=false)=>`
+    <div class="proj-card ${isArch?'proj-card-archived':''}">
+      <div class="proj-card-accent"></div>
+      <div class="proj-card-name">${p.name}</div>
+      <div class="proj-card-cap">⚡ ${cap(p)}</div>
+      <div class="proj-card-meta">更新 ${p.updatedAt} · 建立 ${p.createdAt}</div>
+      <div class="proj-card-actions">
+        ${isArch
+          ?`<button class="proj-btn proj-btn-restore" onclick="restoreProject('${p.id}',event)">↩ 恢复</button>`
+          :`<button class="proj-btn proj-btn-open" onclick="openProject('${p.id}')">📂 打开</button>
+            <button class="proj-btn" onclick="renameProject('${p.id}',event)">✏️ 改名</button>
+            <button class="proj-btn proj-btn-arch" onclick="archiveProject('${p.id}',event)">📦 归档</button>`}
+      </div>
+    </div>`;
+  grid.innerHTML=active.length
+    ?active.map(p=>cardHtml(p)).join('')
+    :`<div class="proj-empty"><div class="proj-empty-icon">📋</div><div>暂无项目，点击右上角「新建项目」开始</div></div>`;
+  // Archived section
+  const archSec=$('archSection');
+  if(archived.length){
+    archSec.style.display='block';
+    $('archGrid').innerHTML=archived.map(p=>cardHtml(p,true)).join('');
+  } else {
+    archSec.style.display='none';
+  }
+}
+
+let archVisible=false;
+function toggleArchived(){
+  archVisible=!archVisible;
+  const g=$('archGrid');
+  const t=document.querySelector('.proj-arch-title');
+  g.style.display=archVisible?'grid':'none';
+  t.textContent=(archVisible?'▲':'▼')+' 已归档项目（点击'+(archVisible?'收起':'展开')+'）';
+}
+
+// ══════════════════════════════════════════════
 //  INIT — prefill with template data
 // ══════════════════════════════════════════════
 function init(){
@@ -1563,9 +1765,20 @@ function init(){
     '取得项目备案及前期手续变更，双方完成首期实缴出资',
     '合资公司取得电网接入批复后完成股权交割，办理工商变更'
   ];
-  renderNav();refresh();refreshForm();updateProgress();
+  // don't call refresh here — will be called when project opens
 }
-init();
+
+// ── Startup ──
+(function startup(){
+  init(); // prefill D defaults
+  // Show dashboard or editor
+  $('appBody').style.display='none';
+  $('btnBack').style.display='none';
+  ['btnPreview','btnExport','btnPrint'].forEach(b=>$(b).style.display='none');
+  $('hdrInfo').style.display='none';
+  $('dashboard').style.display='block';
+  renderDashboard();
+})();
 </script>
 </body>
 </html>
