@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>储能项目上会材料在线生成系统</title>
+<style>
+/* ========== RESET & BASE ========== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Microsoft YaHei','PingFang SC','Helvetica Neue',sans-serif;}
+body{background:#F0F4F1;color:#262626;overflow:hidden;}
+
+/* ========== DESIGN TOKENS (国家电网 State Grid) ========== */
+/* Primary:   #007A3E (State Grid Green)                     */
+/* Dark:      #005A2D                                        */
+/* Medium:    #00963A                                        */
+/* Light bg:  #EAF5EE                                        */
+/* Border:    #D5E6DC                                        */
+/* White:     #FFFFFF                                        */
+
+/* ========== HEADER ========== */
+.hdr{height:50px;background:#007A3E;
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;
+  border-bottom:3px solid #005A2D;position:relative;z-index:50;}
+.hdr-logo{display:flex;align-items:center;gap:10px;}
+.hdr-logo-icon{width:30px;height:30px;background:rgba(255,255,255,.18);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;font-size:15px;}
+.hdr-logo-text{font-size:14px;font-weight:700;color:#fff;letter-spacing:.04em;}
+.hdr-logo-sub{font-size:10px;color:rgba(255,255,255,.65);margin-top:1px;}
+.hdr-actions{display:flex;gap:8px;align-items:center;}
+.hdr-slide-info{font-size:11px;color:rgba(255,255,255,.6);margin-right:6px;}
+
+/* ========== LAYOUT ========== */
+.app-body{display:flex;height:calc(100vh - 50px);}
+
+/* ========== SIDEBAR ========== */
+.sidebar{width:168px;background:#fff;border-right:1px solid #D5E6DC;overflow-y:auto;
+  padding:10px 6px;flex-shrink:0;}
+.sb-label{font-size:10px;color:#8C8C8C;letter-spacing:.08em;text-transform:uppercase;
+  padding:0 8px;margin-bottom:8px;font-weight:600;}
+.sli-item{display:flex;align-items:flex-start;gap:8px;padding:7px 8px;border-radius:4px;
+  cursor:pointer;transition:all .15s;margin-bottom:2px;border:1px solid transparent;}
+.sli-item:hover{background:#EAF5EE;border-color:#B8DECA;}
+.sli-item.active{background:#EAF5EE;border-color:#007A3E;border-left:3px solid #007A3E;}
+.sli-num{min-width:22px;height:22px;border-radius:50%;background:#007A3E;color:#fff;
+  font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.sli-item.active .sli-num{background:#005A2D;}
+.sli-name{font-size:11px;color:#3D3D3D;line-height:1.35;}
+.sli-item.active .sli-name{color:#005A2D;font-weight:600;}
+.sb-progress{padding:12px 8px 6px;}
+.sb-prog-bar{height:4px;background:#E8E8E8;border-radius:2px;overflow:hidden;}
+.sb-prog-fill{height:100%;background:linear-gradient(90deg,#005A2D,#00963A);transition:width .4s;}
+.sb-prog-txt{font-size:10px;color:#8C8C8C;margin-top:5px;}
+.sb-divider{height:1px;background:#E8F0EB;margin:8px 6px;}
+
+/* ========== MAIN AREA ========== */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* TOOLBAR */
+.toolbar{height:40px;background:#fff;border-bottom:1px solid #E0E8E3;
+  display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;}
+.tb-dots{display:flex;gap:5px;align-items:center;}
+.tb-dot{width:6px;height:6px;border-radius:50%;background:#D5E6DC;cursor:pointer;transition:all .2s;}
+.tb-dot.active{background:#007A3E;transform:scale(1.4);}
+.tb-sep{width:1px;height:20px;background:#E0E8E3;margin:0 4px;}
+.tb-info{font-size:11px;color:#8C8C8C;}
+
+/* EDITOR */
+.editor{flex:1;display:flex;overflow:hidden;}
+
+/* SLIDE CANVAS AREA */
+.canvas-area{flex:1;display:flex;align-items:flex-start;justify-content:center;
+  padding:16px;overflow:auto;background:#F0F4F1;}
+.slide-wrap{width:100%;max-width:960px;}
+.slide-outer{position:relative;width:100%;padding-top:56.25%;}
+.slide-inner{position:absolute;top:0;left:0;right:0;bottom:0;
+  background:#fff;border-radius:2px;overflow:hidden;
+  box-shadow:0 1px 6px rgba(0,0,0,.12),0 0 0 1px rgba(0,100,50,.08);
+  color:#1a1a1a;}
+
+/* ========== SLIDE COMPONENTS ========== */
+.sl-hdr{background:#007A3E;padding:0 22px;height:54px;
+  display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.sl-badge{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.2);
+  color:#fff;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.35);}
+.sl-title{color:#fff;font-size:17px;font-weight:700;letter-spacing:.04em;flex:1;}
+.sl-meta{font-size:9px;color:rgba(255,255,255,.55);text-align:right;line-height:1.5;}
+.sl-body{padding:14px 20px;flex:1;overflow:hidden;position:relative;}
+.sl-footer{position:absolute;bottom:5px;right:16px;font-size:8px;color:#ADADAD;}
+/* green accent line under header */
+.sl-hdr-line{height:2px;background:linear-gradient(90deg,#005A2D,#00963A,#E8F5EE);}
+
+/* Info table */
+.tbl{width:100%;border-collapse:collapse;font-size:11px;}
+.tbl td{padding:5px 8px;border:1px solid #E8E8E8;}
+.tbl .lc{background:#F2FAF5;color:#005A2D;font-weight:600;width:32%;}
+.tbl .vc{color:#333;}
+.tbl th{background:#007A3E;color:#fff;padding:5px 8px;font-size:10px;font-weight:600;}
+.tbl tbody tr:hover td{background:#F9FDFB;}
+
+/* Info block */
+.info-block{background:#F2FAF5;border-left:3px solid #007A3E;border-radius:0 3px 3px 0;
+  padding:7px 10px;margin-bottom:7px;}
+.info-block-title{font-size:10px;font-weight:700;color:#005A2D;margin-bottom:3px;}
+.info-block-body{font-size:10px;color:#444;line-height:1.55;}
+
+/* Policy block */
+.policy-block{background:#F5FBF7;border-left:3px solid #007A3E;border-radius:0 3px 3px 0;
+  padding:6px 10px;margin-bottom:7px;}
+.policy-title{font-size:10px;font-weight:700;color:#005A2D;margin-bottom:3px;}
+.policy-content{font-size:9px;color:#555;line-height:1.55;}
+
+/* Metric cards */
+.mcard-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.mcard{background:#fff;border:1px solid #D5E6DC;border-top:3px solid #007A3E;
+  border-radius:3px;padding:9px 10px;text-align:center;}
+.mcard-val{font-size:18px;font-weight:800;color:#007A3E;}
+.mcard-lbl{font-size:9px;color:#8C8C8C;margin-top:2px;}
+
+/* Image placeholder — overflow:hidden + absolute img for reliable cropping */
+.img-ph{background:#F5FAF7;border:1.5px dashed #B8DECA;border-radius:3px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:#A0C0AE;font-size:10px;gap:4px;
+  position:relative;overflow:hidden;}
+.img-ph img{position:absolute;inset:0;width:100%;height:100%;
+  object-fit:cover;object-position:center center;border-radius:2px;}
+/* Image with caption wrapper */
+.img-wrap{display:flex;flex-direction:column;gap:0;}
+.img-cap{font-size:8px;color:#8C8C8C;text-align:center;padding:2px 0;
+  background:#F9FDFB;border:1px solid #E0EAE5;border-top:none;
+  border-radius:0 0 3px 3px;flex-shrink:0;}
+
+/* Cooperation steps */
+.coop-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;}
+.step-num{min-width:20px;height:20px;border-radius:50%;background:#007A3E;color:#fff;
+  font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.step-text{font-size:10px;color:#333;line-height:1.5;}
+
+/* Sum row */
+.sum-row td{background:#EAF5EE;font-weight:700;color:#005A2D;border-top:2px solid #007A3E;}
+
+/* Cover slide */
+.cover-slide{height:100%;background:#007A3E;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  text-align:center;padding:28px;position:relative;overflow:hidden;}
+.cover-geo1{position:absolute;top:-50px;right:-50px;width:200px;height:200px;
+  border-radius:50%;background:rgba(255,255,255,.05);}
+.cover-geo2{position:absolute;top:-20px;right:-20px;width:140px;height:140px;
+  border-radius:50%;background:rgba(255,255,255,.04);}
+.cover-geo3{position:absolute;bottom:-60px;left:-40px;width:220px;height:220px;
+  border-radius:50%;background:rgba(0,0,0,.06);}
+.cover-strip{position:absolute;bottom:0;left:0;right:0;height:5px;
+  background:linear-gradient(90deg,#FFD700 0%,#FFF 30%,rgba(255,255,255,0) 70%);}
+.cover-logo-ph{width:72px;height:72px;border-radius:8px;
+  background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);
+  display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:14px;}
+.cover-company{font-size:11px;color:rgba(255,255,255,.7);margin-bottom:5px;letter-spacing:.05em;}
+.cover-divider{width:60px;height:1px;background:rgba(255,255,255,.3);margin:10px auto;}
+.cover-title{font-size:19px;font-weight:800;color:#fff;line-height:1.35;margin-bottom:10px;letter-spacing:.02em;}
+.cover-tag{display:inline-block;padding:3px 10px;background:rgba(255,255,255,.15);
+  border:1px solid rgba(255,255,255,.3);border-radius:2px;font-size:9px;color:rgba(255,255,255,.85);margin:2px;}
+.cover-date{position:absolute;bottom:12px;right:18px;font-size:9px;color:rgba(255,255,255,.45);}
+
+/* Revenue summary card */
+.rev-total{background:#007A3E;border-radius:4px;padding:14px 16px;text-align:center;margin-top:8px;}
+.rev-total-lbl{font-size:9px;color:rgba(255,255,255,.7);margin-bottom:4px;}
+.rev-total-val{font-size:24px;font-weight:800;color:#fff;}
+.rev-item{background:#fff;border:1px solid #D5E6DC;border-top:2px solid #007A3E;
+  border-radius:3px;padding:8px 10px;margin-bottom:7px;}
+.rev-item-lbl{font-size:9px;color:#007A3E;font-weight:700;margin-bottom:3px;}
+.rev-item-formula{font-size:9px;color:#666;line-height:1.4;margin-bottom:4px;}
+.rev-item-val{font-size:15px;font-weight:800;color:#007A3E;}
+
+/* Doc status */
+.doc-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:3px;
+  border:1px solid #E8E8E8;margin-bottom:5px;}
+.doc-row.ok{background:#F2FAF5;border-color:#B8DECA;}
+.doc-row.wip{background:#FFFBF0;border-color:#F5D87A;}
+.doc-row.no{background:#FFF5F5;border-color:#F0BABA;}
+
+/* ========== FORM PANEL ========== */
+.form-panel{width:340px;background:#FAFCFB;border-left:1px solid #D5E6DC;
+  overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;}
+.fp-hdr{padding:10px 14px;background:#007A3E;color:#fff;
+  font-size:12px;font-weight:600;flex-shrink:0;letter-spacing:.02em;}
+.fp-sec{padding:11px 14px;border-bottom:1px solid #EBF2EE;}
+.fp-sec-title{font-size:10px;color:#007A3E;text-transform:uppercase;
+  letter-spacing:.06em;margin-bottom:9px;font-weight:700;}
+.fg{margin-bottom:9px;}
+.fl{display:block;font-size:10px;color:#595959;margin-bottom:3px;font-weight:500;}
+.fi{width:100%;padding:6px 9px;background:#fff;border:1px solid #D0D0D0;
+  border-radius:3px;color:#262626;font-size:11px;font-family:inherit;transition:border .18s;}
+.fi:focus{outline:none;border-color:#007A3E;box-shadow:0 0 0 2px rgba(0,122,62,.1);}
+.fi.ta{resize:vertical;min-height:54px;}
+.fi.sm{min-height:36px;}
+
+/* Upload */
+.upload-btn{width:100%;padding:10px;background:#fff;border:1.5px dashed #B8DECA;
+  border-radius:3px;text-align:center;cursor:pointer;transition:all .18s;color:#8C8C8C;font-size:11px;}
+.upload-btn:hover{border-color:#007A3E;color:#007A3E;background:#F2FAF5;}
+.upload-btn.has-img{border-style:solid;border-color:#007A3E;background:#F2FAF5;}
+.upload-preview{max-width:100%;max-height:70px;object-fit:contain;display:block;
+  margin:4px auto 0;border-radius:2px;}
+
+/* Dynamic rows */
+.dyn-row{background:#fff;border:1px solid #E0EAE5;border-radius:3px;padding:8px;margin-bottom:7px;}
+.dyn-row-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
+.dyn-row-lbl{font-size:10px;color:#8C8C8C;}
+.del-btn{width:18px;height:18px;border-radius:2px;background:#FFF0F0;border:none;
+  color:#CC3333;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;}
+.del-btn:hover{background:#FFD5D5;}
+.add-btn{width:100%;padding:6px;background:#fff;border:1px dashed #B8DECA;
+  border-radius:3px;color:#007A3E;cursor:pointer;font-size:11px;transition:all .18s;font-weight:500;}
+.add-btn:hover{border-color:#007A3E;background:#EAF5EE;}
+
+/* Calc display */
+.calc-box{background:#EAF5EE;border:1px solid #B8DECA;border-radius:3px;padding:7px 10px;
+  font-size:11px;color:#005A2D;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+.calc-lbl{font-size:9px;color:#6B8E7A;font-weight:400;}
+.calc-total{background:#007A3E;border-radius:3px;padding:9px 12px;
+  display:flex;justify-content:space-between;align-items:center;}
+.calc-total-lbl{font-size:10px;color:rgba(255,255,255,.7);}
+.calc-total-val{font-size:15px;font-weight:800;color:#fff;}
+
+/* Buttons */
+.btn{padding:6px 14px;border-radius:3px;border:none;cursor:pointer;
+  font-size:11px;font-family:inherit;font-weight:600;transition:all .18s;
+  display:inline-flex;align-items:center;gap:5px;}
+.btn-primary{background:#007A3E;color:#fff;}
+.btn-primary:hover{background:#005A2D;}
+.btn-secondary{background:#fff;color:#007A3E;border:1px solid #007A3E;}
+.btn-secondary:hover{background:#EAF5EE;}
+.btn-ghost{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3);}
+.btn-ghost:hover{background:rgba(255,255,255,.22);}
+.btn-sm{padding:5px 11px;font-size:11px;}
+
+/* Full screen preview */
+#preview-modal{display:none;position:fixed;inset:0;background:#1a1a1a;z-index:200;flex-direction:column;}
+.pm-hdr{height:48px;background:#007A3E;border-bottom:2px solid #005A2D;display:flex;
+  align-items:center;padding:0 18px;gap:12px;flex-shrink:0;}
+.pm-body{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto;background:#1a1a1a;}
+.pm-slide{width:100%;max-width:1200px;aspect-ratio:16/9;background:#fff;position:relative;overflow:hidden;
+  border-radius:2px;box-shadow:0 8px 40px rgba(0,0,0,.6);color:#1a1a1a;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:#F0F4F1;}
+::-webkit-scrollbar-thumb{background:#B8DECA;border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:#007A3E;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-logo">
+    <div class="hdr-logo-icon">⚡</div>
+    <div>
+      <div class="hdr-logo-text">储能项目上会材料在线生成系统</div>
+      <div class="hdr-logo-sub">电网侧独立共享储能电站 · 投资决策委员会</div>
+    </div>
+  </div>
+  <div class="hdr-actions">
+    <span class="hdr-slide-info" id="hdrInfo"></span>
+    <button class="btn btn-ghost btn-sm" onclick="previewAll()">👁 全屏预览</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportHTML()">📋 生成报告</button>
+    <button class="btn btn-ghost btn-sm" onclick="printAll()">🖨 打印/导出</button>
+  </div>
+</header>
+
+<div class="app-body">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sb-label">上会大纲</div>
+  <div id="slideNav"></div>
+  <div class="sb-divider"></div>
+  <div class="sb-progress">
+    <div class="sb-prog-bar"><div class="sb-prog-fill" id="progFill" style="width:0%"></div></div>
+    <div class="sb-prog-txt" id="progTxt">填写进度 0%</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="toolbar">
+    <button class="btn btn-secondary btn-sm" onclick="prevSlide()">◀ 上一页</button>
+    <div class="tb-dots" id="tbDots"></div>
+    <button class="btn btn-secondary btn-sm" onclick="nextSlide()">下一页 ▶</button>
+    <div class="tb-sep"></div>
+    <span class="tb-info" id="tbInfo"></span>
+  </div>
+  <div class="editor">
+    <div class="canvas-area">
+      <div class="slide-wrap">
+        <div class="slide-outer">
+          <div class="slide-inner" id="slideCanvas"></div>
+        </div>
+      </div>
+    </div>
+    <div class="form-panel" id="formPanel"></div>
+  </div>
+</main>
+
+</div>
+
+<!-- PREVIEW MODAL -->
+<div id="preview-modal">
+  <div class="pm-hdr">
+    <button class="btn btn-ghost btn-sm" onclick="prevPM()">◀ 上一页</button>
+    <span style="font-size:11px;color:rgba(255,255,255,.7);" id="pmInfo"></span>
+    <button class="btn btn-ghost btn-sm" onclick="nextPM()">下一页 ▶</button>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost btn-sm" onclick="printAll()">🖨 打印</button>
+    <button class="btn btn-ghost btn-sm" onclick="closePM()">✕ 关闭</button>
+  </div>
+  <div class="pm-body">
+    <div class="pm-slide" id="pmSlide"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  DATA MODEL
+// ══════════════════════════════════════════════
+const D = {
+  company:{
+    name:'深圳易储数智能源集团有限公司',
+    nameEn:'Shenzhen Yichu Digital Intelligent Energy Group Co., Ltd.',
+    slogan:'全国电网侧独立共享储能电站行业领导者',
+    logoUrl:''
+  },
+  s0:{
+    projectName:'',province:'',city:'',district:'',
+    powerMW:'',capacityMWh:'',projectType:'电网侧独立共享储能电站',
+    reportDate:'',dept:'项目开发部',coverBgUrl:''
+  },
+  s1:{
+    address:'',addressNotes:'',
+    powerMW:'',capacityMWh:'',projectType:'',capacityNotes:'',
+    landUnitPrice:'',landArea:'',landNotes:'',
+    connectionDesc:'',connectionNotes:'',
+    planApproval:'',planPower:'',planLand:'',constructionStart:'',constructionEnd:'',
+    constructionNotes:'',
+    consultRate:'',consultMWh:'',consultNotes:'',
+    progress:'',extra:''
+  },
+  s2:{
+    policies:[{title:'',content:''}]
+  },
+  s3:{
+    description:'',landNature:'工业用地',needAgri:'否',agriSchedule:'',
+    landSupplyPeriod:'',
+    environment:'',mapUrl:'',site1Url:'',site2Url:'',site3Url:'',site4Url:''
+  },
+  s4:{
+    substationName:'',voltageLevel:'220kV',totalDistance:'',
+    aerialLength:'',undergroundLength:'',
+    connectionNotes:'',surroundingDesc:'',powerDemand:'',
+    diagramUrl:'',mapUrl2:''
+  },
+  s5:{
+    planStatus:'',techRoute:'磷酸铁锂电化学储能',
+    designLife:'20',chargeHours:'2',specs:[]
+  },
+  s6:{
+    docs:[
+      {name:'土地选址意见',status:'已获取',fileUrl:''},
+      {name:'可行性研究报告',status:'已完成',fileUrl:''},
+      {name:'接入系统方案',status:'编制中',fileUrl:''},
+      {name:'电能质量评估报告',status:'编制中',fileUrl:''},
+      {name:'规划选址综合论证报告',status:'编制中',fileUrl:''},
+      {name:'环境影响评估报告',status:'待启动',fileUrl:''},
+      {name:'项目备案文件',status:'待申请',fileUrl:''},
+      {name:'电网接入批复',status:'待申请',fileUrl:''}
+    ]
+  },
+  s7:{
+    targetCompany:'',regDate:'',regCapital:'',legalPerson:'',
+    business:'',credit:'',companyLogoUrl:'',companyPhotoUrl:'',
+    shareholders:[
+      {name:'',ratio:'',background:''},
+      {name:'',ratio:'',background:''}
+    ],
+    shareholderChartUrl:''
+  },
+  s8:{
+    steps:['双方签署框架协议','深圳易储支付履约保证金'],
+    consultType:'按MWh计费',
+    consultRate:'',consultMWh:'',
+    equityEasyStorage:'90',equityPartner:'10',notes:''
+  },
+  s9:{
+    rows:[
+      {seq:'1',name:'股权转让款',scale:'',amount:''},
+      {seq:'2',name:'资源费/咨询服务费',scale:'',amount:''},
+      {seq:'3',name:'土地费',scale:'',amount:''},
+      {seq:'4',name:'接入费用',scale:'',amount:''},
+      {seq:'5',name:'其他费用',scale:'',amount:''}
+    ]
+  },
+  s10:{
+    pfrDays:'330',pfrPower:'',pfrTimes:'',pfrPrice:'8',pfrPerf:'1.8',
+    emCapacity:'',emRoundTrip:'86',emPeakPrice:'',emValleyPrice:'',emDays:'330',emTimes:'1',
+    capPower:'',capStandard:'330',capCoeff:'1',capYears:'2',
+    peakRevenue:'',notes:''
+  },
+  s11:{
+    issues:[{problem:'',measure:''}],
+    urgency:''
+  }
+};
+
+const SLIDES = [
+  {id:'s1', num:'一', name:'项目基本情况',           short:'基本情况'},
+  {id:'s2', num:'二', name:'政策信息',               short:'政策信息'},
+  {id:'s3', num:'三', name:'项目具体选址',           short:'项目选址'},
+  {id:'s4', num:'四', name:'电力接入与周边场站情况', short:'电力接入'},
+  {id:'s8', num:'五', name:'合作思路及合作条件',     short:'合作思路'},
+  {id:'s9', num:'六', name:'项目经济性分析（费用）', short:'成本分析'},
+  {id:'s11',num:'七', name:'存在的问题及应对措施',  short:'问题措施'}
+];
+
+let curIdx=0, pmIdx=0;
+
+// ── helpers ──
+const $=id=>document.getElementById(id);
+const v=(val,ph='—')=>val&&String(val).trim()?val:`<span style="color:#C0C0C0;font-style:italic">${ph}</span>`;
+const num=(val,unit='',ph='—')=>val?val+unit:ph;
+function projectShortName(){
+  const d=D.s0;
+  if(d.projectName) return d.projectName;
+  return (d.province||'')+(d.city||'')+(d.district||'')+(d.powerMW?d.powerMW+'MW/':'')+(d.capacityMWh?d.capacityMWh+'MWh储能电站':'（项目名称）');
+}
+function calcConsult(rate,mwh){
+  if(!rate||!mwh) return '';
+  return (parseFloat(rate)*parseFloat(mwh)*100).toFixed(0);
+}
+function calcLandTotal(unitPrice,area){
+  if(!unitPrice||!area) return '';
+  return (parseFloat(unitPrice)*parseFloat(area)).toFixed(0);
+}
+function calcPFR(days,power,times,price,perf){
+  if(!days||!power||!times||!price||!perf) return '';
+  return (parseFloat(power)*parseFloat(times)*parseFloat(price)*parseFloat(perf)*parseFloat(days)/10000).toFixed(2);
+}
+function calcEM(capacity,roundTrip,peakPrice,valleyPrice,days,times){
+  if(!capacity||!roundTrip||!peakPrice||!valleyPrice||!days) return '';
+  const cap=parseFloat(capacity)*1000*(parseFloat(times)||1);
+  return ((cap*(parseFloat(roundTrip)/100)*parseFloat(peakPrice)-cap*parseFloat(valleyPrice))*parseFloat(days)/10000).toFixed(2);
+}
+function calcCapVal(power,standard,coeff){
+  if(!power||!standard) return null;
+  return (parseFloat(power)*1000*parseFloat(standard)/10000*(parseFloat(coeff)||1)).toFixed(2);
+}
+function calcCostTotal(){
+  return D.s9.rows.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+}
+function escAttr(s){return String(s||'').replace(/"/g,'&quot;');}
+function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── slide shell ──
+function shell(num,title,body){
+  return `<div style="display:flex;flex-direction:column;height:100%;">
+    <div class="sl-hdr">
+      <div class="sl-badge">${num}</div>
+      <div class="sl-title">${title}</div>
+      <div class="sl-meta">${projectShortName()}<br>机密 · 上会材料</div>
+    </div>
+    <div class="sl-hdr-line"></div>
+    <div class="sl-body">${body}</div>
+    <div class="sl-footer">第${num}页 &nbsp;|&nbsp; 深圳易储数智能源集团有限公司 &nbsp;|&nbsp; 机密文件</div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════
+//  SLIDE RENDERERS
+// ══════════════════════════════════════════════
+function renderS0(){
+  const d=D.s0; const c=D.company;
+  const title=d.projectName||(d.province?`${d.province}${d.city}${d.district}${d.powerMW?d.powerMW+'MW/':''}${d.capacityMWh?d.capacityMWh+'MWh':''}储能电站`:'项目名称（请在右侧填写）');
+  return `<div class="cover-slide" style="${d.coverBgUrl?'background-image:url('+d.coverBgUrl+');background-size:cover;background-position:center;':''}">
+    <div class="cover-geo1"></div><div class="cover-geo2"></div><div class="cover-geo3"></div>
+    <div class="cover-strip"></div>
+    ${c.logoUrl?`<img src="${c.logoUrl}" style="height:54px;margin-bottom:12px;border-radius:6px;object-fit:contain;background:rgba(255,255,255,.12);padding:4px;">`
+      :`<div class="cover-logo-ph">⚡</div>`}
+    <div class="cover-company">${c.name}</div>
+    <div style="font-size:9px;color:rgba(255,255,255,.45);margin-bottom:10px;">${c.nameEn}</div>
+    <div class="cover-divider"></div>
+    <div class="cover-title">${title}</div>
+    <div style="margin:4px 0 16px;">
+      <span class="cover-tag">${d.projectType||'电网侧独立共享储能电站'}</span>
+      ${d.powerMW?`<span class="cover-tag">${d.powerMW}MW / ${d.capacityMWh||'—'}MWh</span>`:''}
+    </div>
+    <div style="font-size:10px;color:rgba(255,255,255,.5);">${d.dept||'项目开发部'}</div>
+    <div class="cover-date">${d.reportDate||'——'}</div>
+  </div>`;
+}
+
+function renderS1(){
+  const d=D.s1;
+  const landTotal=calcLandTotal(d.landUnitPrice,d.landArea);
+  const consultTotal=calcConsult(d.consultRate,d.consultMWh);
+  // timeline dots helper
+  const tl=(label,date,active)=>`
+    <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;">
+      <div style="width:9px;height:9px;border-radius:50%;background:${active?'#007A3E':'#C8DDD3'};border:2px solid ${active?'#005A2D':'#B0CCBF'};"></div>
+      <div style="font-size:7px;color:${active?'#007A3E':'#8FAF9B'};font-weight:${active?'700':'400'};text-align:center;">${label}</div>
+      <div style="font-size:7px;color:#555;text-align:center;">${date||'待定'}</div>
+    </div>`;
+  const tlLine=`<div style="flex:1;height:1.5px;background:linear-gradient(90deg,#007A3E,#C8DDD3);margin-top:4px;align-self:flex-start;margin-left:-4px;margin-right:-4px;"></div>`;
+
+  // Notes helper — small remark box at card bottom
+  const nb=(txt)=>txt?`<div style="font-size:8px;color:#666;background:#F5FAF7;border-top:1px dashed #C8DDD3;
+    margin-top:5px;padding:4px 6px;line-height:1.5;border-radius:0 0 3px 3px;flex-shrink:0;">💬 ${txt}</div>`:'';
+
+  const cards=[
+    // 1 项目地址
+    {n:'01',icon:'📍',title:'项目地址',notes:d.addressNotes,body:`
+      <div style="font-size:10px;color:#333;line-height:1.7;">${v(d.address,'待填写项目地址')}</div>`},
+    // 2 装机容量
+    {n:'02',icon:'⚡',title:'装机容量',notes:d.capacityNotes,body:`
+      <div style="display:flex;align-items:flex-end;justify-content:center;gap:2px;margin:4px 0 2px;">
+        <span style="font-size:26px;font-weight:800;color:#007A3E;line-height:1;">${d.powerMW||'—'}</span>
+        <span style="font-size:11px;color:#007A3E;margin-bottom:4px;">MW</span>
+        <span style="font-size:16px;color:#B8DECA;margin:0 4px 2px;">/</span>
+        <span style="font-size:26px;font-weight:800;color:#005A2D;line-height:1;">${d.capacityMWh||'—'}</span>
+        <span style="font-size:11px;color:#005A2D;margin-bottom:4px;">MWh</span>
+      </div>
+      <div style="font-size:9px;color:#8FAF9B;text-align:center;">${v(d.projectType,'电化学储能')}</div>`},
+    // 3 占用土地情况
+    {n:'03',icon:'🏗️',title:'占用土地情况',notes:d.landNotes,body:(()=>{
+      const s3=D.s3;
+      return `<div style="font-size:9.5px;color:#333;line-height:2;">
+        <div>• 占地面积：<b>${v(d.landArea,'—')}</b> 亩</div>
+        <div>• 单价：<b>${v(d.landUnitPrice,'—')}</b> 万元/亩</div>
+        <div>• 合计：<b style="color:#007A3E;">${landTotal&&landTotal!='NaN'?landTotal:'—'}</b> 万元</div>
+        ${s3.landNature?`<div>• 土地性质：<b>${s3.landNature}</b></div>`:''}
+        ${s3.landSupplyPeriod?`<div>• 供地周期：接入批复后 <b style="color:#007A3E;">${s3.landSupplyPeriod}</b> 个月内</div>`:''}
+      </div>`;
+    })()},
+    // 4 接入情况
+    {n:'04',icon:'🔌',title:'接入情况',notes:d.connectionNotes,body:(()=>{
+      const s4=D.s4;
+      const selKv=s4.voltageLevel||'';
+      const row=(icon,label,val,unit='')=>val?`
+        <div style="display:flex;align-items:baseline;gap:4px;font-size:9.5px;line-height:1.8;">
+          <span style="flex-shrink:0;">${icon}</span>
+          <span style="color:#666;">${label}</span>
+          <span style="font-weight:600;color:#222;">${val}</span>
+          ${unit?`<span style="color:#888;font-size:8.5px;">${unit}</span>`:''}
+        </div>`:'';
+      const distDetail=[];
+      if(s4.aerialLength) distDetail.push(`架空 ${s4.aerialLength} km`);
+      if(s4.undergroundLength) distDetail.push(`地埋 ${s4.undergroundLength} km`);
+      return `
+        <div style="font-size:9.5px;line-height:1.9;display:flex;flex-direction:column;gap:2px;">
+          ${row('🏛️','变电站：',s4.substationName||d.connectionDesc||'待填写')}
+          <div style="display:flex;align-items:center;gap:5px;">
+            <span style="font-size:9px;color:#666;">⚡ 电压：</span>
+            ${selKv
+              ?`<span style="background:#007A3E;color:#fff;font-size:8.5px;font-weight:700;
+                  padding:2px 9px;border-radius:10px;">${selKv}</span>`
+              :`<span style="color:#BBB;font-size:9px;">待选择</span>`}
+          </div>
+          ${row('📏','外线距离：',s4.totalDistance,'km')}
+          ${distDetail.length?`<div style="font-size:8.5px;color:#888;padding-left:18px;">${distDetail.join(' · ')}</div>`:''}
+        </div>`;
+    })()},
+    // 5 咨询服务费
+    {n:'05',icon:'💰',title:'咨询服务费',notes:d.consultNotes,body:`
+      <div style="font-size:9px;color:#777;line-height:1.8;">
+        <div>${v(d.consultRate,'—')} 元/Wh × ${v(d.consultMWh,'—')} MWh × 100</div>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:2px;margin-top:2px;">
+        <span style="font-size:22px;font-weight:800;color:#007A3E;line-height:1;">${consultTotal&&consultTotal!='NaN'?consultTotal:'—'}</span>
+        <span style="font-size:10px;color:#007A3E;margin-bottom:2px;">万元</span>
+      </div>`},
+    // 6 建设计划
+    {n:'06',icon:'📅',title:'建设计划',notes:null,body:(()=>{
+      const steps=[
+        {label:'备案纳规', date:d.planApproval||''},
+        {label:'电力接入', date:d.planPower||''},
+        {label:'拍地办证', date:d.planLand||''},
+        {label:'开工建设', date:d.constructionStart||''},
+        {label:'并网投产', date:d.constructionEnd||''},
+      ];
+      const nodes=steps.map((s,i)=>{
+        const hasDate=!!s.date;
+        const isLast=i===steps.length-1;
+        return `
+          <div style="display:flex;flex-direction:column;align-items:center;position:relative;flex:1;">
+            ${i>0?`<div style="position:absolute;top:6px;right:50%;left:-50%;height:1.5px;background:#007A3E;z-index:0;"></div>`:''}
+            <div style="width:13px;height:13px;border-radius:50%;
+              background:${hasDate?'#007A3E':'#fff'};
+              border:2px solid #007A3E;z-index:1;flex-shrink:0;
+              ${isLast?'box-shadow:0 0 0 3px rgba(0,122,62,0.18);':''}"></div>
+            <div style="font-size:7.5px;font-weight:700;color:#007A3E;
+              text-align:center;margin-top:3px;white-space:nowrap;">${s.label}</div>
+            <div style="font-size:7px;color:${hasDate?'#333':'#AAAAAA'};text-align:center;margin-top:1px;white-space:nowrap;">
+              ${hasDate?s.date:'待定'}
+            </div>
+          </div>`;
+      }).join('');
+      const notes=d.constructionNotes?`
+        <div style="font-size:8.5px;color:#666;background:#F5FAF7;border:1px solid #D6EBE1;
+          border-radius:3px;padding:4px 6px;margin-top:5px;line-height:1.5;">${d.constructionNotes}</div>`:'';
+      return `<div style="display:flex;flex-direction:column;">
+        <div style="display:flex;align-items:flex-start;padding:4px 0 0;">${nodes}</div>
+        ${notes}
+      </div>`;
+    })()},
+  ];
+
+  const cardHtml=cards.map(c=>`
+    <div style="background:#fff;border:1px solid #D6EBE1;border-radius:5px;padding:10px 10px 8px;display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden;">
+      <div style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#007A3E;border-radius:3px 0 0 3px;"></div>
+      <div style="display:flex;align-items:center;gap:6px;padding-left:4px;flex-shrink:0;">
+        <div style="background:#007A3E;color:#fff;font-size:8px;font-weight:700;border-radius:3px;padding:1px 5px;flex-shrink:0;">${c.n}</div>
+        <span style="font-size:12px;">${c.icon}</span>
+        <div style="font-size:10.5px;font-weight:700;color:#004E28;">${c.title}</div>
+      </div>
+      <div style="padding-left:4px;flex:1;">${c.body}</div>
+      ${nb(c.notes)}
+    </div>`).join('');
+
+  return shell('一','项目基本情况',`
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;height:calc(100% - 4px);">
+    ${cardHtml}
+  </div>`);
+}
+
+function renderS2(){
+  const pols=D.s2.policies.filter(p=>p.title||p.content);
+  return shell('二','政策信息',`
+  <div style="height:calc(100% - 8px);overflow:auto;">
+    ${pols.length?pols.map(p=>`
+      <div class="policy-block">
+        <div class="policy-title">${v(p.title,'《政策文件名称》')}</div>
+        <div class="policy-content">${v(p.content,'政策内容摘要...')}</div>
+      </div>`).join('')
+    :`<div style="text-align:center;color:#C0C0C0;padding:40px;font-size:11px;">请在右侧添加政策信息</div>`}
+  </div>`);
+}
+
+function renderS3(){
+  const d=D.s3;
+  const s1=D.s1;
+  const s0=D.s0;
+  const landTotal=calcLandTotal(s1.landUnitPrice,s1.landArea);
+
+  // Section with green ➤ arrow header
+  const sect=(title,content)=>`
+    <div style="margin-bottom:9px;">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">
+        <span style="font-size:11px;color:#007A3E;font-weight:900;line-height:1;">➤</span>
+        <span style="font-size:10.5px;font-weight:700;color:#007A3E;">${title}</span>
+      </div>
+      <div style="padding-left:16px;">${content}</div>
+    </div>`;
+
+  // Bullet row helper
+  const bullet=(icon,text)=>text?`
+    <div style="display:flex;align-items:flex-start;gap:5px;font-size:10px;color:#333;line-height:1.6;">
+      <span style="flex-shrink:0;">${icon}</span><span>${text}</span>
+    </div>`:'';
+
+  // Collect site photos (up to 4)
+  const sitePhotos=[
+    {url:d.site1Url,label:'照片1'},{url:d.site2Url,label:'照片2'},
+    {url:d.site3Url,label:'照片3'},{url:d.site4Url,label:'照片4'},
+  ].filter(p=>p.url);
+  const cols=sitePhotos.length||3;
+
+  // Build connection bullets from D.s4 structured data
+  const s4conn=D.s4;
+  const connParts=[];
+  if(s4conn.substationName) connParts.push(`接入 ${s4conn.substationName}`);
+  if(s4conn.voltageLevel)   connParts.push(`电压等级 ${s4conn.voltageLevel}`);
+  if(s4conn.totalDistance)  connParts.push(`外线距离 ${s4conn.totalDistance} km`);
+  if(s4conn.aerialLength)   connParts.push(`架空线路 ${s4conn.aerialLength} km`);
+  if(s4conn.undergroundLength) connParts.push(`地埋电缆 ${s4conn.undergroundLength} km`);
+  // Fallback to s1.connectionDesc text if no structured data
+  const connLines=connParts.length
+    ? connParts
+    : (s1.connectionDesc||'').split(/[,，\n]/).map(l=>l.trim()).filter(Boolean);
+
+  // Land cost section
+  const landSect=sect('占地面积与成本',`
+    <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:3px;">
+      <span style="font-size:20px;font-weight:800;color:#007A3E;line-height:1;">${s1.landArea||'—'}</span>
+      <span style="font-size:9.5px;color:#666;">亩 ×</span>
+      <span style="font-size:20px;font-weight:800;color:#007A3E;line-height:1;">${s1.landUnitPrice||'—'}</span>
+      <span style="font-size:9.5px;color:#666;">万元/亩</span>
+    </div>
+    <div style="font-size:9.5px;color:#555;">= ${landTotal&&landTotal!='NaN'?landTotal:'—'} 万元（${d.landNature||'设施用地'}）</div>
+  `);
+
+  // Grid connection section
+  const connSect=sect('电网接入优势',
+    connLines.length
+      ? connLines.map(l=>bullet('⚡',l)).join('')
+      : bullet('⚡', v(s1.connectionDesc,'待填写接入情况'))
+  );
+
+  // Site conditions section
+  const siteSect=sect('场地条件',`
+    ${bullet('🏠', `土地性质：${d.landNature||'—'} | 农转用：${d.needAgri||'否'}`)}
+    ${bullet('📋', d.agriSchedule||'')}
+    ${bullet('🌱', d.environment||'')}
+    ${bullet('📝', d.description||'')}
+  `);
+
+  // Photo strip — only shown when photos are uploaded
+  const photoStrip=sitePhotos.length?`
+    <div style="display:grid;grid-template-columns:repeat(${cols},1fr);gap:4px;margin-top:auto;padding-top:6px;flex-shrink:0;">
+      ${sitePhotos.map(p=>`
+        <div style="height:44px;border-radius:3px;overflow:hidden;position:relative;border:1px solid #D6EBE1;">
+          <img src="${p.url}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+        </div>`).join('')}
+    </div>`:'';
+
+  return shell('三','项目具体选址',`
+  <div style="display:grid;grid-template-columns:42% 58%;gap:10px;height:calc(100% - 4px);">
+
+    <!-- LEFT: info panel -->
+    <div style="display:flex;flex-direction:column;height:100%;overflow:hidden;">
+      <!-- Project header banner -->
+      <div style="background:#007A3E;border-radius:4px;padding:7px 12px;margin-bottom:9px;flex-shrink:0;">
+        <div style="font-size:11.5px;font-weight:700;color:#fff;text-align:center;line-height:1.4;">${v(s0.projectName,'项目名称')}</div>
+        <div style="font-size:10px;color:#A8DEAD;text-align:center;margin-top:2px;">
+          【${s1.powerMW||'—'}MW/${s1.capacityMWh||'—'}MWh】独立储能项目
+        </div>
+      </div>
+      ${landSect}
+      ${connSect}
+      ${siteSect}
+      ${photoStrip}
+    </div>
+
+    <!-- RIGHT: satellite / map image -->
+    <div style="position:relative;border-radius:4px;overflow:hidden;border:1.5px solid #D6EBE1;height:100%;">
+      ${d.mapUrl
+        ?`<img src="${d.mapUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`
+        :`<div class="img-ph" style="position:absolute;inset:0;border-radius:3px;border:none;">
+           <span style="font-size:32px;">🗺️</span>
+           <span style="font-size:10px;">区位图 / 卫星地图</span>
+         </div>`}
+    </div>
+
+  </div>`);
+}
+
+function renderS4(){
+  const d=D.s4;
+  return shell('四','电力接入与周边场站情况',`
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;height:calc(100% - 8px);">
+    <!-- LEFT col: table + diagram -->
+    <div style="display:flex;flex-direction:column;gap:7px;">
+      <table class="tbl" style="font-size:10px;">
+        <tr><td class="lc">接入变电站</td><td class="vc">${v(d.substationName)}</td></tr>
+        <tr><td class="lc">电压等级</td><td class="vc">${v(d.voltageLevel)}</td></tr>
+        <tr><td class="lc">线路距离</td><td class="vc">
+          ${d.totalDistance?`<b>${d.totalDistance} km</b> 合计`:('—')}
+          ${(d.aerialLength||d.undergroundLength)?`<span style="font-size:9px;color:#888;margin-left:4px;">（架空 ${d.aerialLength||0} km · 地埋 ${d.undergroundLength||0} km）</span>`:''}
+        </td></tr>
+      </table>
+      <div class="img-wrap" style="flex:1;min-height:0;">
+        <div class="img-ph" style="height:130px;">
+          ${d.diagramUrl?`<img src="${d.diagramUrl}" alt="接入系统图">`
+            :`<span style="font-size:22px">⚡</span><span>电网接入示意图</span>`}
+        </div>
+        <div class="img-cap">电网接入系统图</div>
+      </div>
+    </div>
+    <!-- RIGHT col: notes + map -->
+    <div style="display:flex;flex-direction:column;gap:7px;">
+      ${d.connectionNotes?`<div class="policy-block"><div class="policy-title">接入注意事项</div><div class="policy-content">${d.connectionNotes}</div></div>`:''}
+      ${d.surroundingDesc?`<div class="policy-block" style="border-color:#F5A623;background:#FFFBF0;"><div class="policy-title" style="color:#8B6000;">周边场站情况</div><div class="policy-content">${d.surroundingDesc}</div></div>`:''}
+      ${d.powerDemand?`<div class="policy-block" style="border-color:#1E90FF;background:#F0F7FF;"><div class="policy-title" style="color:#003399;">电力需求</div><div class="policy-content">${d.powerDemand}</div></div>`:''}
+      ${!d.connectionNotes&&!d.surroundingDesc&&!d.powerDemand?`<div style="color:#C0C0C0;font-size:10px;text-align:center;padding:16px;font-style:italic;">请填写接入情况说明</div>`:''}
+      ${d.mapUrl2?`<div class="img-wrap" style="flex:1;min-height:0;">
+        <div class="img-ph" style="height:80px;"><img src="${d.mapUrl2}" alt="接入地图"></div>
+        <div class="img-cap">接入区域地图</div>
+      </div>`:''}
+    </div>
+  </div>`);
+}
+
+function renderS5(){
+  const d=D.s5;
+  const extraSpecs=d.specs.filter(s=>s.name||s.value);
+  return shell('五','建设指标',`
+  <div style="height:calc(100% - 8px);">
+    ${d.planStatus?`<div class="info-block" style="margin-bottom:10px;"><div class="info-block-title">📋 规划纳入情况</div><div class="info-block-body">${d.planStatus}</div></div>`:'<div style="padding:8px 12px;background:#F5FBF7;border:1px dashed #B8DECA;border-radius:3px;margin-bottom:10px;color:#A0C0AE;font-size:10px;font-style:italic;text-align:center;">请填写规划纳入情况</div>'}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div>
+        <table class="tbl" style="font-size:10px;">
+          <tr><td class="lc">技术路线</td><td class="vc">${v(d.techRoute)}</td></tr>
+          <tr><td class="lc">设计使用年限</td><td class="vc">${num(d.designLife,' 年')}</td></tr>
+          <tr><td class="lc">充放电时长</td><td class="vc">${num(d.chargeHours,' 小时')}</td></tr>
+          <tr><td class="lc">装机功率</td><td class="vc">${D.s1.powerMW?D.s1.powerMW+' MW':'—'}</td></tr>
+          <tr><td class="lc">装机容量</td><td class="vc">${D.s1.capacityMWh?D.s1.capacityMWh+' MWh':'—'}</td></tr>
+        </table>
+      </div>
+      <div>
+        ${extraSpecs.length?`<table class="tbl" style="font-size:10px;">
+          ${extraSpecs.map(s=>`<tr><td class="lc">${s.name||'—'}</td><td class="vc">${s.value||'—'}</td></tr>`).join('')}
+        </table>`:`<div style="color:#C0C0C0;font-size:10px;text-align:center;padding:30px;font-style:italic;">可在右侧添加更多技术指标</div>`}
+      </div>
+    </div>
+  </div>`);
+}
+
+function renderS6(){
+  const d=D.s6;
+  return shell('六','支持性文件与获取到的尽调材料',`
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;height:calc(100% - 8px);align-content:start;">
+    ${d.docs.map(doc=>{
+      const ok=doc.status==='已获取'||doc.status==='已完成';
+      const wip=doc.status==='编制中';
+      const icon=ok?'✅':wip?'⏳':'❌';
+      const cls=ok?'doc-row ok':wip?'doc-row wip':'doc-row no';
+      return `<div class="${cls}">
+        <span style="font-size:12px;">${icon}</span>
+        <div style="flex:1;">
+          <div style="font-size:10px;font-weight:600;color:#333;">${doc.name}</div>
+          <div style="font-size:9px;color:#888;margin-top:1px;">${doc.status}</div>
+        </div>
+        ${doc.fileUrl?`<span style="font-size:9px;color:#007A3E;">📎已上传</span>`:''}
+      </div>`;
+    }).join('')}
+  </div>`);
+}
+
+function renderS7(){
+  const d=D.s7;
+  const shs=d.shareholders.filter(s=>s.name||s.ratio);
+  return shell('七','合作方公司及股东公司',`
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;height:calc(100% - 8px);">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #E8F0EB;">
+        <div class="img-ph" style="width:50px;height:50px;flex-shrink:0;border-radius:4px;">
+          ${d.companyLogoUrl?`<img src="${d.companyLogoUrl}" style="width:50px;height:50px;object-fit:contain;">`:`<span style="font-size:20px">🏢</span>`}
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:12px;color:#007A3E;">${v(d.targetCompany,'合作方/标的公司名称')}</div>
+          <div style="font-size:9px;color:#8C8C8C;margin-top:2px;">注册日期：${v(d.regDate,'—')}</div>
+        </div>
+      </div>
+      <table class="tbl" style="font-size:10px;">
+        <tr><td class="lc">注册资本</td><td class="vc">${d.regCapital?d.regCapital+' 万元':'—'}</td></tr>
+        <tr><td class="lc">法定代表人</td><td class="vc">${v(d.legalPerson)}</td></tr>
+        <tr><td class="lc">主营业务</td><td class="vc" style="font-size:9px;line-height:1.4;">${v(d.business)}</td></tr>
+        <tr><td class="lc">信用评级</td><td class="vc">${v(d.credit)}</td></tr>
+      </table>
+      <div class="img-wrap" style="margin-top:7px;">
+        <div class="img-ph" style="height:62px;">
+          ${d.companyPhotoUrl?`<img src="${d.companyPhotoUrl}" alt="公司照片">`:`<span style="font-size:14px">📸</span><span style="font-size:9px">公司/园区照片</span>`}
+        </div>
+        <div class="img-cap">公司/园区照片</div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#007A3E;margin-bottom:7px;">📊 股东结构</div>
+      <div class="img-wrap" style="margin-bottom:7px;">
+        <div class="img-ph" style="height:75px;background:#fff;">
+          ${d.shareholderChartUrl
+            ?`<img src="${d.shareholderChartUrl}" alt="股权结构图" style="object-fit:contain;">`
+            :`<span style="font-size:16px">📊</span><span style="font-size:9px">股权结构图</span>`}
+        </div>
+        <div class="img-cap">股权结构图</div>
+      </div>
+      ${shs.length?`<table class="tbl" style="font-size:9px;">
+        <tr><th>股东名称</th><th>持股比例</th><th>背景</th></tr>
+        ${shs.map(s=>`<tr><td class="vc">${v(s.name)}</td><td class="vc">${s.ratio?s.ratio+'%':'—'}</td><td class="vc">${v(s.background)}</td></tr>`).join('')}
+      </table>`
+      :`<div style="color:#C0C0C0;font-size:10px;text-align:center;padding:14px;font-style:italic;">请填写股东信息</div>`}
+    </div>
+  </div>`);
+}
+
+function renderS8(){
+  const d=D.s8;
+  const consultTotal=calcConsult(d.consultRate,d.consultMWh);
+  const steps=d.steps.filter(s=>s.trim());
+  return shell('五','合作思路及合作条件',`
+  <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px;height:calc(100% - 8px);">
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#007A3E;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid #D5E6DC;">合作思路</div>
+      ${steps.length?steps.map((s,i)=>`
+        <div class="coop-step">
+          <div class="step-num">${i+1}</div>
+          <div class="step-text">${s}</div>
+        </div>`).join('')
+      :`<div style="color:#C0C0C0;font-size:10px;font-style:italic;">请填写合作步骤...</div>`}
+    </div>
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#007A3E;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid #D5E6DC;">合作条件</div>
+      <table class="tbl" style="font-size:10px;">
+        <tr><td class="lc">合作方式</td><td class="vc">${v(d.consultType)}</td></tr>
+        <tr><td class="lc">单价</td><td class="vc">${d.consultRate?d.consultRate+' 元/Wh':'—'}</td></tr>
+        <tr><td class="lc">储能容量</td><td class="vc">${d.consultMWh?d.consultMWh+' MWh':'—'}</td></tr>
+        <tr><td class="lc" style="color:#007A3E;font-weight:700;">服务费合计</td><td class="vc" style="color:#007A3E;font-weight:700;">${consultTotal?consultTotal+'万元':'—'}</td></tr>
+        <tr><td class="lc">易储持股</td><td class="vc">${d.equityEasyStorage?d.equityEasyStorage+'%':'—'}</td></tr>
+        <tr><td class="lc">他方持股</td><td class="vc">${d.equityPartner?d.equityPartner+'%':'—'}</td></tr>
+      </table>
+      ${d.notes?`<div class="info-block" style="margin-top:8px;"><div class="info-block-body" style="font-size:9px;">${d.notes}</div></div>`:''}
+    </div>
+  </div>`);
+}
+
+function renderS9(){
+  const d=D.s9;
+  const s1=D.s1;
+  const s8=D.s8;
+  // Auto values from upstream — land from s1, consult from s8 (合作条件) with s1 fallback
+  const autoLand    = calcLandTotal(s1.landUnitPrice,s1.landArea);
+  const consultRate = s8.consultRate||s1.consultRate;
+  const consultMWh  = s8.consultMWh||s1.consultMWh;
+  const autoConsult = calcConsult(consultRate,consultMWh);
+  const validNum=v=>v&&v!='NaN'&&!isNaN(parseFloat(v));
+
+  // Augment rows: override scale+amount for land/consult rows
+  const augment=r=>{
+    const nm=(r.name||'');
+    if(nm.includes('土地')&&validNum(autoLand)){
+      const scale=s1.landArea&&s1.landUnitPrice?`${s1.landArea}亩 × ${s1.landUnitPrice}万元/亩`:r.scale;
+      return {...r,scale,amount:autoLand,_auto:true};
+    }
+    if((nm.includes('资源')||nm.includes('咨询'))&&validNum(autoConsult)){
+      const scale=consultRate&&consultMWh?`${consultRate}元/Wh × ${consultMWh}MWh`:r.scale;
+      return {...r,scale,amount:autoConsult,_auto:true};
+    }
+    return r;
+  };
+
+  const rows=d.rows.filter(r=>r.name||r.amount).map(augment);
+  // Recalculate total from augmented rows
+  const total=rows.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+
+  return shell('六','项目经济性分析（费用）',`
+  <div style="height:calc(100% - 8px);">
+    <div style="font-size:10px;color:#007A3E;font-weight:600;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #D5E6DC;">
+      ${projectShortName()} &nbsp;投资前期开发费用汇总表（单位：万元）
+    </div>
+    <table class="tbl" style="font-size:11px;">
+      <thead>
+        <tr><th style="width:8%;">序号</th><th style="width:28%;">费用名称</th><th style="width:37%;">建设规模</th><th style="width:27%;">金额（万元）</th></tr>
+      </thead>
+      <tbody>
+        ${rows.length?rows.map(r=>`
+          <tr>
+            <td class="vc" style="text-align:center;">${r.seq}</td>
+            <td class="vc">${r.name||'—'}</td>
+            <td class="vc" style="font-size:9px;color:#666;">${r.scale||'—'}</td>
+            <td class="vc" style="font-weight:700;color:#007A3E;">
+              ${r.amount||'—'}
+              ${r._auto?`<span style="font-size:7px;color:#A0C0AE;margin-left:3px;" title="自动引用前文数据">↗自动</span>`:''}
+            </td>
+          </tr>`).join('')
+        :`<tr><td colspan="4" style="text-align:center;color:#C0C0C0;font-style:italic;padding:18px;">请在右侧添加费用明细</td></tr>`}
+        ${total?`<tr class="sum-row">
+          <td style="text-align:center;padding:6px 8px;">合计</td>
+          <td colspan="2"></td>
+          <td style="font-size:14px;padding:6px 8px;">${total.toFixed(0)}&nbsp;万元</td>
+        </tr>`:''}
+      </tbody>
+    </table>
+  </div>`);
+}
+
+function renderS10(){
+  const d=D.s10;
+  const pfr=calcPFR(d.pfrDays,d.pfrPower,d.pfrTimes,d.pfrPrice,d.pfrPerf);
+  const em=calcEM(d.emCapacity,d.emRoundTrip,d.emPeakPrice,d.emValleyPrice,d.emDays,d.emTimes);
+  const capVal=calcCapVal(d.capPower,d.capStandard,d.capCoeff);
+  const total=((parseFloat(pfr)||0)+(parseFloat(em)||0)+(parseFloat(capVal)||0)*(parseFloat(d.capYears)||2)+(parseFloat(d.peakRevenue)||0)).toFixed(2);
+  return shell('十','项目经济性测算（收益率）',`
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;height:calc(100% - 8px);">
+    <div style="display:flex;flex-direction:column;gap:7px;">
+      <div class="rev-item">
+        <div class="rev-item-lbl">1. 调频里程收益（含税）</div>
+        <div class="rev-item-formula">${d.pfrPower?`${d.pfrPower}MW × ${d.pfrTimes}次/日 × ${d.pfrPrice}元/MW × ${d.pfrPerf} × ${d.pfrDays}天`:'填写右侧参数后自动计算'}</div>
+        <div class="rev-item-val">${pfr?pfr+' 万元/年':'—'}</div>
+      </div>
+      <div class="rev-item">
+        <div class="rev-item-lbl">2. 电能量交易收益（含税）</div>
+        <div class="rev-item-formula">${d.emCapacity?`${d.emCapacity}MWh × ${d.emRoundTrip}% × ${d.emTimes}次/日 × 峰${d.emPeakPrice}元 − 谷${d.emValleyPrice}元 × ${d.emDays}天`:'填写右侧参数后自动计算'}</div>
+        <div class="rev-item-val">${em?em+' 万元/年':'—'}</div>
+      </div>
+      <div class="rev-item">
+        <div class="rev-item-lbl">3. 容量电价收益</div>
+        <div class="rev-item-formula">${d.capPower?`${d.capPower}MW × 1000kW/MW × ${d.capStandard}元/kW/年 × ${d.capCoeff} × ${d.capYears}年`:'填写右侧参数后自动计算'}</div>
+        <div class="rev-item-val">${capVal?capVal+' 万元/年 × '+d.capYears+'年':'—'}</div>
+      </div>
+      ${d.peakRevenue?`<div class="rev-item"><div class="rev-item-lbl">4. 其他收益</div><div class="rev-item-val">${d.peakRevenue} 万元/年</div></div>`:``}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;justify-content:center;">
+      <div class="rev-total">
+        <div class="rev-total-lbl">年收益合计（含税）</div>
+        <div class="rev-total-val">${parseFloat(total)>0?total+' 万元':'—'}</div>
+        <div style="font-size:9px;color:rgba(255,255,255,.55);margin-top:5px;">调频 + 电能量 + 容量电价${d.peakRevenue?' + 其他':''}</div>
+      </div>
+      ${d.notes?`<div class="info-block"><div class="info-block-body" style="font-size:9px;">${d.notes}</div></div>`:''}
+    </div>
+  </div>`);
+}
+
+function renderS11(){
+  const d=D.s11;
+  const issues=d.issues.filter(i=>i.problem||i.measure);
+  return shell('七','存在的问题及应对措施',`
+  <div style="height:calc(100% - 8px);">
+    <table class="tbl" style="font-size:10px;margin-bottom:10px;">
+      <thead>
+        <tr><th style="width:10%;">序号</th><th style="width:40%;">存在的问题</th><th style="width:50%;">应对措施</th></tr>
+      </thead>
+      <tbody>
+        ${issues.length?issues.map((iss,i)=>`
+          <tr>
+            <td class="vc" style="text-align:center;">${i+1}</td>
+            <td class="vc">${iss.problem||'—'}</td>
+            <td class="vc">${iss.measure||'—'}</td>
+          </tr>`).join('')
+        :`<tr><td colspan="3" style="text-align:center;color:#C0C0C0;font-style:italic;padding:18px;">请填写存在的问题</td></tr>`}
+      </tbody>
+    </table>
+    ${d.urgency?`<div class="policy-block" style="border-color:#F5A623;background:#FFFBF0;">
+      <div class="policy-title" style="color:#8B6000;">⚠ 需要解决及明确的问题</div>
+      <div class="policy-content">${d.urgency}</div>
+    </div>`:''}
+  </div>`);
+}
+
+function renderSlide(idx){
+  const fns=[renderS1,renderS2,renderS3,renderS4,renderS8,renderS9,renderS11];
+  return fns[idx]();
+}
+
+// ══════════════════════════════════════════════
+//  FORM RENDERERS
+// ══════════════════════════════════════════════
+function fi(key,sk,ph,type='text'){
+  const val=(D[sk]&&D[sk][key]!==undefined)?D[sk][key]:'';
+  return `<input class="fi" type="${type}" placeholder="${ph}" value="${escAttr(val)}"
+    onchange="upd('${sk}','${key}',this.value)" oninput="upd('${sk}','${key}',this.value)">`;
+}
+function ta(key,sk,ph,rows=2){
+  const val=(D[sk]&&D[sk][key]!==undefined)?D[sk][key]:'';
+  return `<textarea class="fi ta sm" style="min-height:${rows*22+12}px" placeholder="${ph}"
+    onchange="upd('${sk}','${key}',this.value)" oninput="upd('${sk}','${key}',this.value)">${escHtml(val)}</textarea>`;
+}
+function sel(key,sk,opts){
+  const val=(D[sk]&&D[sk][key]!==undefined)?D[sk][key]:'';
+  return `<select class="fi" onchange="upd('${sk}','${key}',this.value)">
+    ${opts.map(o=>`<option ${val===o?'selected':''}>${o}</option>`).join('')}
+  </select>`;
+}
+function fg(lbl,inp){return `<div class="fg"><label class="fl">${lbl}</label>${inp}</div>`;}
+function sec(title,content){return `<div class="fp-sec"><div class="fp-sec-title">${title}</div>${content}</div>`;}
+function uploadFG(lbl,sk,fk){
+  const url=D[sk]&&D[sk][fk+'Url']?D[sk][fk+'Url']:'';
+  return `<div class="fg"><label class="fl">${lbl}</label>
+    <div class="upload-btn ${url?'has-img':''}" onclick="trigUpload('${sk}','${fk}')">
+      ${url?`<img class="upload-preview" src="${url}"><div style="font-size:9px;color:#007A3E;margin-top:3px;">✅ 已上传 — 点击更换</div>`
+           :`<div>📁 点击上传图片</div>`}
+    </div>
+    <input type="file" accept="image/*" id="upf_${sk}_${fk}" style="display:none" onchange="handleUp('${sk}','${fk}',this)">
+  </div>`;
+}
+function calcBox(lbl,val,unit='万元'){
+  return `<div class="calc-box"><span class="calc-lbl">${lbl}</span><span>${val?val+' '+unit:'待计算...'}</span></div>`;
+}
+function calcTotalBox(lbl,val){
+  return `<div class="calc-total"><span class="calc-total-lbl">${lbl}</span><span class="calc-total-val">${val||'—'}</span></div>`;
+}
+
+function renderF0(){
+  return `<div class="fp-hdr">📋 封面信息</div>
+  ${sec('公司信息',
+    fg('公司名称',`<input class="fi" placeholder="深圳易储数智能源集团有限公司" value="${escAttr(D.company.name)}" oninput="D.company.name=this.value;refresh()">`) +
+    uploadFG('公司 Logo','company','logo')
+  )}
+  ${sec('项目基础信息',
+    fg('项目名称（可留空自动生成）',`<input class="fi" placeholder="如：甘肃省张掖市甘州区400MW/1600MWh储能电站" value="${escAttr(D.s0.projectName)}" oninput="upd('s0','projectName',this.value)">`) +
+    fg('省份',fi('province','s0','如：甘肃省')) +
+    fg('城市',fi('city','s0','如：张掖市')) +
+    fg('区县',fi('district','s0','如：甘州区')) +
+    fg('项目类型',sel('projectType','s0',['电网侧独立共享储能电站','构网型储能电站','电源侧储能电站','用户侧储能电站'])) +
+    fg('装机功率 (MW)',fi('powerMW','s0','如：400','number')) +
+    fg('装机容量 (MWh)',fi('capacityMWh','s0','如：1600','number'))
+  )}
+  ${sec('报告信息',
+    fg('报告日期',fi('reportDate','s0','如：2026年3月26日')) +
+    fg('出具部门',fi('dept','s0','如：项目开发部'))
+  )}`;
+}
+
+function renderF1(){
+  const d=D.s1;
+  const lt=calcLandTotal(d.landUnitPrice,d.landArea);
+  const ct=calcConsult(d.consultRate,d.consultMWh);
+  return `<div class="fp-hdr">一、项目基本情况</div>
+  ${sec('① 项目地址',
+    fg('项目地址',fi('address','s1','如：甘肃省张掖市甘州区')) +
+    fg('备注说明',ta('addressNotes','s1','如：地址补充说明...',2))
+  )}
+  ${sec('② 装机容量',
+    fg('装机功率 (MW)',fi('powerMW','s1','如：400','number')) +
+    fg('装机容量 (MWh)',fi('capacityMWh','s1','如：1600','number')) +
+    fg('项目类型',fi('projectType','s1','如：电化学储能')) +
+    fg('备注说明',ta('capacityNotes','s1','如：技术路线、电池类型说明...',2))
+  )}
+  ${sec('③ 占用土地情况',
+    fg('土地面积 (亩)',fi('landArea','s1','如：160','number')) +
+    fg('土地单价 (万元/亩)',fi('landUnitPrice','s1','如：4.2','number')) +
+    calcBox('土地总价（自动计算）',lt) +
+    fg('土地性质',fi('landNature','s3','如：工业用地 / 设施农用地')) +
+    fg('供地周期（月）',`<div style="display:flex;align-items:center;gap:6px;">
+      ${fi('landSupplyPeriod','s3','如：3','number')}
+      <span style="font-size:11px;color:#888;white-space:nowrap;">个月（接入批复后）</span>
+    </div>`) +
+    fg('备注说明',ta('landNotes','s1','如：供地方式、手续进展...',2))
+  )}
+  ${sec('④ 接入情况',
+    fg('接入变电站名称',fi('substationName','s4','如：甘州220kV变电站')) +
+    fg('电压等级',`<div style="display:flex;gap:10px;flex-wrap:wrap;padding:4px 0;">
+      ${['110kV','220kV','330kV','500kV'].map(lv=>`
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;">
+          <input type="checkbox" value="${lv}"
+            ${(D.s4.voltageLevel===lv)?'checked':''}
+            onchange="D.s4.voltageLevel=this.checked?'${lv}':'';
+              document.querySelectorAll('[name=kv]').forEach(cb=>{if(cb!==this)cb.checked=false;});
+              refresh();"
+            name="kv">
+          <span>${lv}</span>
+        </label>`).join('')}
+    </div>`) +
+    fg('外线总距离 (km)',fi('totalDistance','s4','如：1.5','number')) +
+    fg('架空线路 (km)',fi('aerialLength','s4','如：1.0','number')) +
+    fg('地埋电缆 (km)',fi('undergroundLength','s4','如：0.5','number')) +
+    fg('备注说明',ta('connectionNotes','s1','如：接入批复进度、注意事项...',2))
+  )}
+  ${sec('⑤ 咨询服务费',
+    fg('单价 (元/Wh)',fi('consultRate','s1','如：0.01','number')) +
+    fg('容量 (MWh)',fi('consultMWh','s1','如：1600','number')) +
+    calcBox('服务费合计（自动计算）',ct) +
+    fg('备注说明',ta('consultNotes','s1','如：费用支付方式、阶段安排...',2))
+  )}
+  ${sec('⑥ 建设计划',
+    fg('① 备案纳规',fi('planApproval','s1','如：2025年12月')) +
+    fg('② 电力接入',fi('planPower','s1','如：2026年3月')) +
+    fg('③ 拍地办证',fi('planLand','s1','如：2026年6月')) +
+    fg('④ 开工建设',fi('constructionStart','s1','如：2026年9月')) +
+    fg('⑤ 并网投产',fi('constructionEnd','s1','如：2026年12月')) +
+    fg('备注说明',ta('constructionNotes','s1','如：关键节点说明、风险提示...',2))
+  )}`;
+}
+
+function renderF2(){
+  return `<div class="fp-hdr">二、政策信息</div>
+  ${D.s2.policies.map((p,i)=>`
+  <div class="fp-sec">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div class="fp-sec-title">政策 ${i+1}</div>
+      <button class="del-btn" onclick="delPolicy(${i})">✕</button>
+    </div>
+    ${fg('政策/文件名称',`<input class="fi" placeholder="如：《关于建立发电侧可靠容量补偿机制的通知》" value="${escAttr(p.title)}" oninput="D.s2.policies[${i}].title=this.value;refresh()">`)}
+    ${fg('政策内容摘要',`<textarea class="fi ta" style="min-height:60px" placeholder="政策核心内容..." oninput="D.s2.policies[${i}].content=this.value;refresh()">${escHtml(p.content)}</textarea>`)}
+  </div>`).join('')}
+  <div style="padding:10px 14px;"><button class="add-btn" onclick="addPolicy()">+ 添加政策条目</button></div>`;
+}
+
+function renderF3(){
+  return `<div class="fp-hdr">三、项目具体选址</div>
+  ${sec('选址描述',
+    fg('位置详述',ta('description','s3','位置描述、地理条件、交通情况、周边环境...',4)) +
+    fg('土地性质',sel('landNature','s3',['工业用地','农用地（需农转用）','未利用地','荒地/荒漠','滩涂','其他'])) +
+    fg('是否需要农转用',sel('needAgri','s3',['否','是'])) +
+    (D.s3.needAgri==='是'?fg('农转用时间安排',fi('agriSchedule','s3','如：预计8月调规、12月挂牌')):'') +
+    fg('周边环境补充',ta('environment','s3','无机场、军事设施等说明...',2))
+  )}
+  ${sec('图片附件（建议上传横向/景观照片，效果更佳）',
+    `<div style="font-size:9px;color:#8C8C8C;margin-bottom:8px;padding:5px 7px;background:#F0F4F1;border-radius:3px;">
+      💡 提示：优先上传<b>横向</b>图片（区位图、地图截图）。竖版图片会自动居中裁切，不会影响幻灯片布局。
+    </div>` +
+    uploadFG('📍 区位图 / 卫星地图（主图，建议16:9）','s3','map') +
+    uploadFG('📸 现场照片 1','s3','site1') +
+    uploadFG('📸 现场照片 2','s3','site2') +
+    uploadFG('📸 现场照片 3（可选）','s3','site3') +
+    uploadFG('📸 现场照片 4（可选）','s3','site4')
+  )}`;
+}
+
+function renderF4(){
+  const s4=D.s4;
+  const syncInfo=`<div style="background:#F2FAF5;border:1px solid #C0DDD0;border-radius:4px;padding:8px 10px;font-size:11px;color:#555;line-height:1.8;">
+    <div style="font-weight:600;color:#007A3E;margin-bottom:4px;">⚡ 以下参数已在「一、基本情况 → ④接入情况」中填写，此处同步显示</div>
+    <div>变电站：<b>${s4.substationName||'—'}</b></div>
+    <div>电压等级：<b>${s4.voltageLevel||'—'}</b></div>
+    <div>外线距离：<b>${s4.totalDistance||'—'}</b> km（架空 ${s4.aerialLength||'—'} km · 地埋 ${s4.undergroundLength||'—'} km）</div>
+    <div style="margin-top:4px;font-size:10px;color:#888;">如需修改，请在左侧导航切换至「基本情况」页面填写。</div>
+  </div>`;
+  return `<div class="fp-hdr">四、电力接入情况</div>
+  ${sec('接入技术参数', syncInfo)}
+  ${sec('接入说明',
+    fg('接入注意事项',ta('connectionNotes','s4','跨越线路、施工注意事项等...',3)) +
+    fg('周边场站情况',ta('surroundingDesc','s4','周边光伏、风电、其他储能情况...',3)) +
+    fg('区域电力需求',ta('powerDemand','s4','区域用电量、工业用电等...',2))
+  )}
+  ${sec('图片附件',
+    uploadFG('接入系统图','s4','diagram') +
+    uploadFG('接入区域地图','s4','mapUrl2')
+  )}`;
+}
+
+function renderF5(){
+  return `<div class="fp-hdr">五、建设指标</div>
+  ${sec('规划情况',fg('省规划纳入情况',fi('planStatus','s5','如：已纳入甘肃省十四五新型储能规划')))}
+  ${sec('技术参数',
+    fg('技术路线',sel('techRoute','s5',['磷酸铁锂电化学储能','三元锂电池储能','钠离子电池储能','全钒液流电池','飞轮储能'])) +
+    fg('设计使用年限 (年)',fi('designLife','s5','如：20','number')) +
+    fg('充放电时长 (小时)',fi('chargeHours','s5','如：2','number'))
+  )}
+  ${sec('扩展指标',
+    D.s5.specs.map((sp,i)=>`
+      <div class="dyn-row">
+        <div class="dyn-row-hdr"><span class="dyn-row-lbl">指标 ${i+1}</span><button class="del-btn" onclick="delSpec(${i})">✕</button></div>
+        ${fg('指标名称',`<input class="fi" placeholder="指标名称" value="${escAttr(sp.name)}" oninput="D.s5.specs[${i}].name=this.value;refresh()">`)}
+        ${fg('指标值',`<input class="fi" placeholder="指标值" value="${escAttr(sp.value)}" oninput="D.s5.specs[${i}].value=this.value;refresh()">`)}
+      </div>`).join('') +
+    `<button class="add-btn" onclick="addSpec()">+ 添加技术指标</button>`
+  )}`;
+}
+
+function renderF6(){
+  const smap=['已获取','已完成','编制中','待申请','待启动','不需要'];
+  return `<div class="fp-hdr">六、支持性文件</div>
+  ${D.s6.docs.map((doc,i)=>`
+  <div class="fp-sec">
+    <div class="dyn-row-hdr" style="margin-bottom:8px;">
+      <div class="fp-sec-title">${i+1}. ${doc.name}</div>
+      <button class="del-btn" onclick="delDoc(${i})">✕</button>
+    </div>
+    ${fg('文件名称',`<input class="fi" value="${escAttr(doc.name)}" oninput="D.s6.docs[${i}].name=this.value;refresh()">`)}
+    ${fg('获取状态',`<select class="fi" onchange="D.s6.docs[${i}].status=this.value;refresh()">
+      ${smap.map(s=>`<option ${doc.status===s?'selected':''}>${s}</option>`).join('')}
+    </select>`)}
+    <div class="fg"><label class="fl">上传文件</label>
+      <div class="upload-btn ${doc.fileUrl?'has-img':''}" onclick="trigDocUp(${i})">
+        ${doc.fileUrl?'✅ 已上传 — 点击更换':'📎 上传文件截图'}
+      </div>
+      <input type="file" accept="image/*" id="docup_${i}" style="display:none" onchange="handleDocUp(${i},this)">
+    </div>
+  </div>`).join('')}
+  <div style="padding:10px 14px;"><button class="add-btn" onclick="addDoc()">+ 添加文件</button></div>`;
+}
+
+function renderF7(){
+  return `<div class="fp-hdr">七、合作方及股东公司</div>
+  ${sec('公司基本信息',
+    fg('标的公司/合作方名称',fi('targetCompany','s7','如：甘肃黑河水电实业投资有限责任公司')) +
+    fg('注册日期',fi('regDate','s7','如：2015-01-01','date')) +
+    fg('注册资本 (万元)',fi('regCapital','s7','如：1000','number')) +
+    fg('法定代表人',fi('legalPerson','s7','法人姓名')) +
+    fg('主营业务',ta('business','s7','公司主营业务描述...',2)) +
+    fg('信用评级',sel('credit','s7',['AAA','AA+','AA','AA-','A+','A','BBB+','BBB','无评级']))
+  )}
+  ${sec('股东结构',
+    D.s7.shareholders.map((s,i)=>`
+      <div class="dyn-row">
+        <div class="dyn-row-hdr"><span class="dyn-row-lbl">股东 ${i+1}</span><button class="del-btn" onclick="delSh(${i})">✕</button></div>
+        ${fg('股东名称',`<input class="fi" placeholder="股东名称" value="${escAttr(s.name)}" oninput="D.s7.shareholders[${i}].name=this.value;refresh()">`)}
+        ${fg('持股比例 (%)',`<input class="fi" type="number" placeholder="如：51" value="${escAttr(s.ratio)}" oninput="D.s7.shareholders[${i}].ratio=this.value;refresh()">`)}
+        ${fg('股东背景',`<input class="fi" placeholder="国有/民营/上市公司" value="${escAttr(s.background)}" oninput="D.s7.shareholders[${i}].background=this.value;refresh()">`)}
+      </div>`).join('') +
+    `<button class="add-btn" onclick="addSh()">+ 添加股东</button>`
+  )}
+  ${sec('图片附件',
+    uploadFG('公司 Logo','s7','companyLogo') +
+    uploadFG('公司照片','s7','companyPhoto') +
+    uploadFG('股权结构图','s7','shareholderChart')
+  )}`;
+}
+
+function renderF8(){
+  const d=D.s8;
+  const ct=calcConsult(d.consultRate,d.consultMWh);
+  return `<div class="fp-hdr">五、合作思路及合作条件</div>
+  ${sec('合作步骤',
+    D.s8.steps.map((step,i)=>`
+      <div class="dyn-row">
+        <div class="dyn-row-hdr"><span class="dyn-row-lbl">步骤 ${i+1}</span><button class="del-btn" onclick="delStep(${i})">✕</button></div>
+        <textarea class="fi ta sm" style="min-height:44px" placeholder="步骤描述..." oninput="D.s8.steps[${i}]=this.value;refresh()">${escHtml(step)}</textarea>
+      </div>`).join('') +
+    `<button class="add-btn" onclick="addStep()">+ 添加步骤</button>`
+  )}
+  ${sec('合作条件',
+    fg('计费方式',sel('consultType','s8',['按MWh计费','按MW计费','固定总价','股权收购价'])) +
+    fg('单价 (元/Wh)',fi('consultRate','s8','如：0.01或0.03','number')) +
+    fg('容量 (MWh)',fi('consultMWh','s8','如：1600','number')) +
+    calcBox('服务费合计（自动计算）',ct) +
+    fg('易储持股比例 (%)',fi('equityEasyStorage','s8','如：90','number')) +
+    fg('他方持股比例 (%)',fi('equityPartner','s8','如：10','number')) +
+    fg('补充说明',ta('notes','s8','履约保证金、股权交割条件等...',3))
+  )}`;
+}
+
+function renderF9(){
+  return `<div class="fp-hdr">六、项目经济性分析（费用）</div>
+  ${D.s9.rows.map((r,i)=>`
+  <div class="fp-sec">
+    <div class="dyn-row-hdr" style="margin-bottom:8px;">
+      <div class="fp-sec-title">费用项 ${i+1}</div>
+      <button class="del-btn" onclick="delCostRow(${i})">✕</button>
+    </div>
+    ${fg('序号',`<input class="fi" placeholder="1" value="${escAttr(r.seq)}" oninput="D.s9.rows[${i}].seq=this.value;refresh()">`)}
+    ${fg('费用名称',`<input class="fi" placeholder="如：股权转让款" value="${escAttr(r.name)}" oninput="D.s9.rows[${i}].name=this.value;refresh()">`)}
+    ${fg('建设规模说明',`<input class="fi" placeholder="如：0.01×1600MWh" value="${escAttr(r.scale)}" oninput="D.s9.rows[${i}].scale=this.value;refresh()">`)}
+    ${fg('金额 (万元)',`<input class="fi" type="number" placeholder="金额" value="${escAttr(r.amount)}" oninput="D.s9.rows[${i}].amount=this.value;refresh()">`)}
+  </div>`).join('')}
+  <div style="padding:8px 14px 4px;"><button class="add-btn" onclick="addCostRow()">+ 添加费用项</button></div>
+  <div style="padding:4px 14px 14px;">${calcTotalBox('合计',calcCostTotal()?calcCostTotal().toFixed(0)+' 万元':null)}</div>`;
+}
+
+function renderF10(){
+  const d=D.s10;
+  const pfr=calcPFR(d.pfrDays,d.pfrPower,d.pfrTimes,d.pfrPrice,d.pfrPerf);
+  const em=calcEM(d.emCapacity,d.emRoundTrip,d.emPeakPrice,d.emValleyPrice,d.emDays,d.emTimes);
+  const capVal=calcCapVal(d.capPower,d.capStandard,d.capCoeff);
+  const total=((parseFloat(pfr)||0)+(parseFloat(em)||0)+(parseFloat(capVal)||0)*(parseFloat(d.capYears)||2)+(parseFloat(d.peakRevenue)||0)).toFixed(2);
+  return `<div class="fp-hdr">十、项目经济性测算（收益率）</div>
+  ${sec('调频里程收益',
+    fg('调频功率 (MW)',fi('pfrPower','s10','如：40','number')) +
+    fg('日均调频次数',fi('pfrTimes','s10','如：300','number')) +
+    fg('综合单价 (元/MW)',fi('pfrPrice','s10','如：8','number')) +
+    fg('调节性能系数',fi('pfrPerf','s10','如：1.8','number')) +
+    fg('年运行天数',fi('pfrDays','s10','如：330','number')) +
+    calcBox('调频年收益（含税）',pfr)
+  )}
+  ${sec('电能量交易收益',
+    fg('储能容量 (MWh)',fi('emCapacity','s10','如：800','number')) +
+    fg('日充放次数',fi('emTimes','s10','如：1','number')) +
+    fg('综合效率 (% 回路)',fi('emRoundTrip','s10','如：86','number')) +
+    fg('峰时电价 (元/kWh)',fi('emPeakPrice','s10','如：0.45','number')) +
+    fg('谷时电价 (元/kWh)',fi('emValleyPrice','s10','如：0.15','number')) +
+    fg('年运行天数',fi('emDays','s10','如：330','number')) +
+    calcBox('电能量年收益（含税）',em)
+  )}
+  ${sec('容量电价收益',
+    fg('申报容量 (MW)',fi('capPower','s10','如：200','number')) +
+    fg('容量补偿标准 (元/kW/年)',fi('capStandard','s10','如：330','number')) +
+    fg('容量供需系数',fi('capCoeff','s10','如：1.0','number')) +
+    fg('执行年限 (年)',fi('capYears','s10','如：2','number')) +
+    calcBox('容量电价年收益',capVal?capVal+' × '+d.capYears+'年':null)
+  )}
+  ${sec('其他收益',
+    fg('调峰/其他 (万元/年)',fi('peakRevenue','s10','如有则填','number')) +
+    fg('备注说明',ta('notes','s10','测算依据、假设条件...',3))
+  )}
+  <div style="padding:6px 14px 14px;">${calcTotalBox('年收益合计（含税）',parseFloat(total)>0?total+' 万元':null)}</div>`;
+}
+
+function renderF11(){
+  return `<div class="fp-hdr">七、存在的问题及应对措施</div>
+  ${D.s11.issues.map((iss,i)=>`
+  <div class="fp-sec">
+    <div class="dyn-row-hdr" style="margin-bottom:8px;">
+      <div class="fp-sec-title">问题 ${i+1}</div>
+      <button class="del-btn" onclick="delIssue(${i})">✕</button>
+    </div>
+    ${fg('存在的问题',`<textarea class="fi ta sm" style="min-height:44px" placeholder="问题描述..." oninput="D.s11.issues[${i}].problem=this.value;refresh()">${escHtml(iss.problem)}</textarea>`)}
+    ${fg('应对措施',`<textarea class="fi ta sm" style="min-height:44px" placeholder="应对措施..." oninput="D.s11.issues[${i}].measure=this.value;refresh()">${escHtml(iss.measure)}</textarea>`)}
+  </div>`).join('')}
+  <div style="padding:10px 14px;"><button class="add-btn" onclick="addIssue()">+ 添加问题条目</button></div>
+  ${sec('需决策事项',fg('需明确/决策的紧急事项',ta('urgency','s11','如：该项目参与竞企较多，需我司尽快决策...',3)))}`;
+}
+
+function renderForm(idx){
+  const fns=[renderF1,renderF2,renderF3,renderF4,renderF8,renderF9,renderF11];
+  return fns[idx]();
+}
+
+// ══════════════════════════════════════════════
+//  DATA MUTATIONS
+// ══════════════════════════════════════════════
+function upd(sk,k,val){D[sk][k]=val;refresh();}
+function refresh(){$('slideCanvas').innerHTML=renderSlide(curIdx);updateProgress();}
+function refreshForm(){$('formPanel').innerHTML=renderForm(curIdx);}
+
+function addPolicy(){D.s2.policies.push({title:'',content:''});refreshForm();refresh();}
+function delPolicy(i){D.s2.policies.splice(i,1);refreshForm();refresh();}
+function addSpec(){D.s5.specs.push({name:'',value:''});refreshForm();}
+function delSpec(i){D.s5.specs.splice(i,1);refreshForm();refresh();}
+function addDoc(){D.s6.docs.push({name:'新文件',status:'待申请',fileUrl:''});refreshForm();refresh();}
+function delDoc(i){D.s6.docs.splice(i,1);refreshForm();refresh();}
+function addSh(){D.s7.shareholders.push({name:'',ratio:'',background:''});refreshForm();refresh();}
+function delSh(i){D.s7.shareholders.splice(i,1);refreshForm();refresh();}
+function addStep(){D.s8.steps.push('');refreshForm();refresh();}
+function delStep(i){D.s8.steps.splice(i,1);refreshForm();refresh();}
+function addCostRow(){D.s9.rows.push({seq:String(D.s9.rows.length+1),name:'',scale:'',amount:''});refreshForm();refresh();}
+function delCostRow(i){D.s9.rows.splice(i,1);refreshForm();refresh();}
+function addIssue(){D.s11.issues.push({problem:'',measure:''});refreshForm();refresh();}
+function delIssue(i){D.s11.issues.splice(i,1);refreshForm();refresh();}
+
+function trigUpload(sk,fk){document.getElementById('upf_'+sk+'_'+fk).click();}
+function handleUp(sk,fk,input){
+  if(input.files&&input.files[0]){
+    const r=new FileReader();
+    r.onload=e=>{D[sk][fk+'Url']=e.target.result;refresh();refreshForm();};
+    r.readAsDataURL(input.files[0]);
+  }
+}
+function trigDocUp(i){document.getElementById('docup_'+i).click();}
+function handleDocUp(i,input){
+  if(input.files&&input.files[0]){
+    const r=new FileReader();
+    r.onload=e=>{D.s6.docs[i].fileUrl=e.target.result;refresh();refreshForm();};
+    r.readAsDataURL(input.files[0]);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════
+function goTo(idx){curIdx=idx;renderNav();refresh();refreshForm();}
+function prevSlide(){if(curIdx>0)goTo(curIdx-1);}
+function nextSlide(){if(curIdx<SLIDES.length-1)goTo(curIdx+1);}
+
+function renderNav(){
+  $('slideNav').innerHTML=SLIDES.map((s,i)=>`
+    <div class="sli-item ${i===curIdx?'active':''}" onclick="goTo(${i})">
+      <div class="sli-num">${s.num}</div>
+      <div class="sli-name">${s.short}</div>
+    </div>`).join('');
+  $('tbDots').innerHTML=SLIDES.map((_,i)=>`<div class="tb-dot ${i===curIdx?'active':''}" onclick="goTo(${i})"></div>`).join('');
+  $('tbInfo').textContent=`${SLIDES[curIdx].name}  （${curIdx+1} / ${SLIDES.length}）`;
+  $('hdrInfo').textContent=`第 ${curIdx+1} 页 / 共 ${SLIDES.length} 页`;
+}
+
+function updateProgress(){
+  let filled=0,total=0;
+  const check=obj=>{if(!obj)return;Object.values(obj).forEach(v=>{if(typeof v==='string'){total++;if(v.trim())filled++;}});};
+  ['s0','s1','s3','s4','s5','s7','s8'].forEach(k=>check(D[k]));
+  const pct=total>0?Math.round(filled/total*100):0;
+  $('progFill').style.width=pct+'%';
+  $('progTxt').textContent='填写进度 '+pct+'%';
+}
+
+document.addEventListener('keydown',e=>{
+  if($('preview-modal').style.display==='flex'){
+    if(e.key==='ArrowLeft')prevPM();
+    if(e.key==='ArrowRight')nextPM();
+    if(e.key==='Escape')closePM();
+  } else {
+    const tag=document.activeElement.tagName.toLowerCase();
+    if(tag==='input'||tag==='textarea'||tag==='select') return;
+    if(e.key==='ArrowLeft')prevSlide();
+    if(e.key==='ArrowRight')nextSlide();
+  }
+});
+
+// ══════════════════════════════════════════════
+//  PREVIEW & EXPORT
+// ══════════════════════════════════════════════
+function previewAll(){pmIdx=curIdx;$('preview-modal').style.display='flex';renderPM();}
+function renderPM(){$('pmSlide').innerHTML=renderSlide(pmIdx);$('pmInfo').textContent=`第 ${pmIdx+1} 页 / 共 ${SLIDES.length} 页 — ${SLIDES[pmIdx].name}`;}
+function prevPM(){if(pmIdx>0){pmIdx--;renderPM();}}
+function nextPM(){if(pmIdx<SLIDES.length-1){pmIdx++;renderPM();}}
+function closePM(){$('preview-modal').style.display='none';}
+
+function getEmbedStyles(){
+  return `
+    .sl-hdr{background:#007A3E;padding:0 22px;height:54px;display:flex;align-items:center;gap:12px;}
+    .sl-hdr-line{height:2px;background:linear-gradient(90deg,#005A2D,#00963A,#EAF5EE);}
+    .sl-badge{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.35);}
+    .sl-title{color:#fff;font-size:17px;font-weight:700;letter-spacing:.04em;flex:1;}
+    .sl-meta{font-size:9px;color:rgba(255,255,255,.55);text-align:right;line-height:1.5;}
+    .sl-body{padding:14px 20px;position:relative;}
+    .sl-footer{position:absolute;bottom:5px;right:16px;font-size:8px;color:#ADADAD;}
+    .tbl{width:100%;border-collapse:collapse;font-size:11px;}
+    .tbl td{padding:5px 8px;border:1px solid #E8E8E8;}
+    .tbl .lc{background:#F2FAF5;color:#005A2D;font-weight:600;width:32%;}
+    .tbl .vc{color:#333;}
+    .tbl th{background:#007A3E;color:#fff;padding:5px 8px;font-size:10px;font-weight:600;}
+    .tbl tbody tr:hover td{background:#F9FDFB;}
+    .sum-row td{background:#EAF5EE;font-weight:700;color:#005A2D;border-top:2px solid #007A3E;}
+    .info-block{background:#F2FAF5;border-left:3px solid #007A3E;border-radius:0 3px 3px 0;padding:7px 10px;margin-bottom:7px;}
+    .info-block-title{font-size:10px;font-weight:700;color:#005A2D;margin-bottom:3px;}
+    .info-block-body{font-size:10px;color:#444;line-height:1.55;}
+    .policy-block{background:#F5FBF7;border-left:3px solid #007A3E;border-radius:0 3px 3px 0;padding:6px 10px;margin-bottom:7px;}
+    .policy-title{font-size:10px;font-weight:700;color:#005A2D;margin-bottom:3px;}
+    .policy-content{font-size:9px;color:#555;line-height:1.55;}
+    .img-ph{background:#F5FAF7;border:1.5px dashed #B8DECA;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#A0C0AE;font-size:10px;gap:4px;position:relative;overflow:hidden;}
+    .img-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;border-radius:2px;}
+    .img-wrap{display:flex;flex-direction:column;gap:0;}
+    .img-cap{font-size:8px;color:#8C8C8C;text-align:center;padding:2px 0;background:#F9FDFB;border:1px solid #E0EAE5;border-top:none;border-radius:0 0 3px 3px;}
+    .coop-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;}
+    .step-num{min-width:20px;height:20px;border-radius:50%;background:#007A3E;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+    .step-text{font-size:10px;color:#333;line-height:1.5;}
+    .rev-item{background:#fff;border:1px solid #D5E6DC;border-top:2px solid #007A3E;border-radius:3px;padding:8px 10px;margin-bottom:7px;}
+    .rev-item-lbl{font-size:9px;color:#007A3E;font-weight:700;margin-bottom:3px;}
+    .rev-item-formula{font-size:9px;color:#666;line-height:1.4;margin-bottom:4px;}
+    .rev-item-val{font-size:15px;font-weight:800;color:#007A3E;}
+    .rev-total{background:#007A3E;border-radius:4px;padding:14px 16px;text-align:center;margin-top:8px;}
+    .rev-total-lbl{font-size:9px;color:rgba(255,255,255,.7);margin-bottom:4px;}
+    .rev-total-val{font-size:24px;font-weight:800;color:#fff;}
+    .doc-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:3px;border:1px solid #E8E8E8;margin-bottom:5px;}
+    .doc-row.ok{background:#F2FAF5;border-color:#B8DECA;}
+    .doc-row.wip{background:#FFFBF0;border-color:#F5D87A;}
+    .doc-row.no{background:#FFF5F5;border-color:#F0BABA;}
+    .cover-slide{height:100%;background:#007A3E;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:28px;position:relative;overflow:hidden;}
+    .cover-geo1{position:absolute;top:-50px;right:-50px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.05);}
+    .cover-geo2{position:absolute;top:-20px;right:-20px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.04);}
+    .cover-geo3{position:absolute;bottom:-60px;left:-40px;width:220px;height:220px;border-radius:50%;background:rgba(0,0,0,.06);}
+    .cover-strip{position:absolute;bottom:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#FFD700 0%,#FFF 30%,rgba(255,255,255,0) 70%);}
+    .cover-logo-ph{width:72px;height:72px;border-radius:8px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:14px;}
+    .cover-company{font-size:11px;color:rgba(255,255,255,.7);margin-bottom:5px;letter-spacing:.05em;}
+    .cover-divider{width:60px;height:1px;background:rgba(255,255,255,.3);margin:10px auto;}
+    .cover-title{font-size:19px;font-weight:800;color:#fff;line-height:1.35;margin-bottom:10px;letter-spacing:.02em;}
+    .cover-tag{display:inline-block;padding:3px 10px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:2px;font-size:9px;color:rgba(255,255,255,.85);margin:2px;}
+    .cover-date{position:absolute;bottom:12px;right:18px;font-size:9px;color:rgba(255,255,255,.45);}
+  `;
+}
+
+function printAll(){
+  const win=window.open('','_blank','width=1280,height=900');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>${projectShortName()} — 上会材料</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Microsoft YaHei','PingFang SC',sans-serif;background:#f5f5f5;}
+    .page{width:297mm;height:167.0625mm;background:#fff;position:relative;overflow:hidden;
+      page-break-after:always;margin:0 auto 8mm;display:flex;flex-direction:column;}
+    @media print{body{background:#fff;}.page{margin:0;}}
+    ${getEmbedStyles()}
+  </style></head><body>
+  ${SLIDES.map((_,i)=>`<div class="page">${renderSlide(i)}</div>`).join('')}
+  <script>window.onload=()=>setTimeout(()=>window.print(),800);<\/script>
+  </body></html>`);
+  win.document.close();
+}
+
+function exportHTML(){printAll();}
+
+// ══════════════════════════════════════════════
+//  INIT — prefill with template data
+// ══════════════════════════════════════════════
+function init(){
+  D.s2.policies=[
+    {title:'《关于建立发电侧可靠容量补偿机制的通知（试行）》',
+     content:'建立发电侧可靠容量补偿机制，对电力系统确有需要并在全年系统顶峰时段能持续稳定供电的机组进行补偿。可靠容量补偿标准暂定为每年每千瓦330元，自2026年1月1日起执行。'},
+    {title:'省级辅助服务市场运营规则',
+     content:'新型储能根据接入电网地点可以分为电网侧储能、电源侧储能、用户侧储能。其中，电网侧储能可以独立主体身份参与辅助服务市场交易。'},
+    {title:'电力现货市场规则',
+     content:'独立储能依据消纳和保供需要最大化调用，能基本实现日均一充一放，部分日期实现两充两放。'}
+  ];
+  D.s8.steps=[
+    '双方签署框架协议',
+    '深圳易储支付履约保证金',
+    '双方成立合资公司（易储持股90%，他方持股10%）',
+    '取得项目备案及前期手续变更，双方完成首期实缴出资',
+    '合资公司取得电网接入批复后完成股权交割，办理工商变更'
+  ];
+  renderNav();refresh();refreshForm();updateProgress();
+}
+init();
+</script>
+</body>
+</html>
