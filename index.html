@@ -313,6 +313,10 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
 .proj-arch-title{font-size:11px;color:#9AB;margin-bottom:12px;cursor:pointer;user-select:none;}
 .proj-card-archived{opacity:.6;border-style:dashed;}
 .proj-card-archived .proj-card-accent{background:#B0C8BC;}
+.dash-data-btn{background:#fff;color:#555;border:1.5px solid #D5E6DC;border-radius:6px;
+  padding:9px 16px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;}
+.dash-data-btn:hover{background:#EAF5EE;border-color:#007A3E;color:#007A3E;}
+.dash-topbar-right{display:flex;align-items:center;gap:8px;}
 .btn-back{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);
   border-radius:4px;padding:5px 12px;font-size:11px;cursor:pointer;display:none;}
 .btn-back:hover{background:rgba(255,255,255,.25);}
@@ -381,7 +385,11 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
       <div class="dash-title">📂 项目管理</div>
       <div class="dash-subtitle">所有项目数据本地保存，永久保留</div>
     </div>
-    <button class="dash-new-btn" onclick="createNewProject()">＋ 新建项目</button>
+    <div class="dash-topbar-right">
+      <button class="dash-data-btn" onclick="importData()" title="从备份文件恢复数据">📥 导入备份</button>
+      <button class="dash-data-btn" onclick="exportData()" title="将所有数据导出为 JSON 文件">📤 导出备份</button>
+      <button class="dash-new-btn" onclick="createNewProject()">＋ 新建项目</button>
+    </div>
   </div>
   <div class="proj-grid" id="projGrid"></div>
   <div class="proj-arch-section" id="archSection" style="display:none;">
@@ -534,6 +542,17 @@ const D = {
   s11:{
     issues:[{problem:'',measure:''}],
     urgency:''
+  },
+  s12:{
+    items:[
+      {label:'现货收益', amount:'', notes:'', deduct:false},
+      {label:'调频收益', amount:'', notes:'', deduct:false},
+      {label:'调峰收益', amount:'', notes:'', deduct:false},
+      {label:'容量电价', amount:'', notes:'', deduct:false},
+      {label:'容量电费', amount:'', notes:'', deduct:true },
+      {label:'容量租赁', amount:'', notes:'', deduct:false},
+      {label:'其他收益', amount:'', notes:'', deduct:false}
+    ]
   }
 };
 
@@ -546,7 +565,8 @@ const SLIDES = [
   {id:'s4',   num:'四',   name:'电力接入与周边场站情况',   short:'电力接入'},
   {id:'s8',   num:'五',   name:'合作思路及合作条件',       short:'合作思路'},
   {id:'s9',   num:'六',   name:'项目经济性分析（费用）',   short:'成本分析'},
-  {id:'s11',  num:'七',   name:'存在的问题及应对措施',     short:'问题措施'}
+  {id:'s12',  num:'七',   name:'项目收益分析',             short:'收益分析'},
+  {id:'s11',  num:'八',   name:'存在的问题及应对措施',     short:'问题措施'}
 ];
 
 let curIdx=0, pmIdx=0;
@@ -633,7 +653,8 @@ function renderSMenu(){
     {num:'四', name:'电力接入与周边场站情况', desc:'变电站·电压等级·外线距离'},
     {num:'五', name:'合作思路及合作条件',     desc:'合作步骤·资源费·股权结构'},
     {num:'六', name:'项目经济性分析（费用）', desc:'投资成本·费用明细'},
-    {num:'七', name:'存在的问题及应对措施',   desc:'风险分析·解决方案'},
+    {num:'七', name:'项目收益分析',           desc:'现货·调频·调峰·容量电价·总收益'},
+    {num:'八', name:'存在的问题及应对措施',   desc:'风险分析·解决方案'},
   ];
   const pname=projectShortName();
   return `<div style="display:flex;flex-direction:column;height:100%;background:#fff;">
@@ -648,9 +669,9 @@ function renderSMenu(){
         ${contentSlides.map((s,i)=>`
           <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;
             border-radius:4px;background:${i%2===0?'#F5FAF7':'#FAFFFE'};
-            border-left:3px solid ${['#007A3E','#00963A','#34A85A','#5BBE78','#82CE98','#A8DDB5','#C8EDD6'][i]||'#007A3E'};">
+            border-left:3px solid ${['#007A3E','#00963A','#34A85A','#5BBE78','#82CE98','#A8DDB5','#C8EDD6','#B0D4BE'][i]||'#007A3E'};">
             <div style="min-width:26px;height:26px;border-radius:50%;
-              background:${['#007A3E','#00963A','#34A85A','#5BBE78','#82CE98','#A8DDB5','#C8EDD6'][i]||'#007A3E'};
+              background:${['#007A3E','#00963A','#34A85A','#5BBE78','#82CE98','#A8DDB5','#C8EDD6','#B0D4BE'][i]||'#007A3E'};
               color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
               ${s.num}
             </div>
@@ -1186,7 +1207,7 @@ function renderS11(){
   const d=D.s11;
   // support both old {problem,measure} and new {title,content} structures
   const issues=d.issues.filter(i=>i.title||i.content||i.problem||i.measure);
-  return shell('七','存在的问题及应对措施',`
+  return shell('八','存在的问题及应对措施',`
   <div style="height:calc(100% - 8px);overflow:auto;">
     ${issues.length?issues.map((iss,i)=>{
       const title=iss.title||(iss.problem?'存在的问题':'');
@@ -1212,8 +1233,77 @@ function renderS11(){
   </div>`);
 }
 
+function calcRevenueTotal(){
+  return (D.s12.items||[]).reduce((sum,it)=>{
+    const v=parseFloat(it.amount)||0;
+    return sum + (it.deduct ? -v : v);
+  },0);
+}
+
+function renderS12(){
+  const items=D.s12.items||[];
+  const total=calcRevenueTotal();
+  const totalStr=total?total.toFixed(2):'—';
+  const totalColor=total>0?'#007A3E':total<0?'#C62828':'#999';
+
+  const rows=items.map((it,i)=>{
+    const amt=parseFloat(it.amount)||0;
+    const hasVal=it.amount!=='';
+    return `<tr style="${it.deduct?'background:#FFF8F8;':''}">
+      <td class="vc" style="font-size:9.5px;font-weight:${it.deduct?'600':'400'};color:${it.deduct?'#C62828':'#333'};padding:5px 8px;">
+        ${it.deduct?'':''}${it.label}${it.deduct?' <span style="font-size:8px;background:#FFEBEE;color:#C62828;border-radius:2px;padding:1px 3px;">扣减</span>':''}
+      </td>
+      <td class="vc" style="text-align:right;font-size:10px;font-weight:600;padding:5px 8px;color:${it.deduct?'#C62828':'#222'};">
+        ${hasVal?(it.deduct?'− ':'+ ')+Math.abs(amt).toFixed(2):'—'}
+      </td>
+      <td class="vc" style="font-size:8.5px;color:#777;padding:5px 8px;">${it.notes||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  return shell('七','项目收益分析',`
+  <div style="display:flex;flex-direction:column;gap:10px;height:calc(100% - 8px);">
+    <!-- 总收益突出展示 -->
+    <div style="background:linear-gradient(135deg,#005A2D,#007A3E);border-radius:6px;padding:12px 20px;
+      display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div>
+        <div style="font-size:9px;color:rgba(255,255,255,.65);letter-spacing:.1em;">项目总收益（年）</div>
+        <div style="font-size:28px;font-weight:800;color:#fff;line-height:1.15;letter-spacing:-.5px;">
+          ${totalStr} <span style="font-size:13px;font-weight:400;opacity:.8;">万元</span>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:8px;color:rgba(255,255,255,.5);margin-bottom:4px;">= 各项收益之和 − 容量电费</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.7);">
+          ${items.filter(it=>!it.deduct&&it.amount).map(it=>`+${parseFloat(it.amount).toFixed(2)}`).join(' ')}
+          ${items.filter(it=>it.deduct&&it.amount).map(it=>` − ${parseFloat(it.amount).toFixed(2)}`).join('')}
+        </div>
+      </div>
+    </div>
+    <!-- 明细表 -->
+    <div style="flex:1;overflow:auto;">
+      <table class="tbl" style="font-size:10px;">
+        <thead>
+          <tr>
+            <th style="width:30%;">收益项目</th>
+            <th style="width:22%;text-align:right;">金额（万元/年）</th>
+            <th style="width:48%;">备注说明</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+        <tfoot>
+          <tr style="background:#F2FAF5;">
+            <td style="font-weight:700;font-size:10px;padding:6px 8px;color:#005A2D;">合计</td>
+            <td style="font-weight:800;font-size:11px;text-align:right;padding:6px 8px;color:${totalColor};">${totalStr}</td>
+            <td style="padding:6px 8px;font-size:8.5px;color:#999;">万元/年</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>`);
+}
+
 function renderSlide(idx){
-  const fns=[renderS0,renderSMenu,renderS1,renderS2,renderS3,renderS4,renderS8,renderS9,renderS11];
+  const fns=[renderS0,renderSMenu,renderS1,renderS2,renderS3,renderS4,renderS8,renderS9,renderS12,renderS11];
   return fns[idx]();
 }
 
@@ -1544,7 +1634,7 @@ function renderF10(){
 }
 
 function renderF11(){
-  return `<div class="fp-hdr">七、存在的问题及应对措施</div>
+  return `<div class="fp-hdr">八、存在的问题及应对措施</div>
   ${D.s11.issues.map((iss,i)=>{
     // support both old {problem,measure} and new {title,content}
     const titleVal=iss.title!==undefined?iss.title:(iss.problem||'');
@@ -1569,8 +1659,33 @@ function renderFMenu(){
   </div>`;
 }
 
+function renderF12(){
+  const items=D.s12.items||[];
+  const total=calcRevenueTotal();
+  const totalStr=total?total.toFixed(2)+'  万元/年':'待填写';
+  const totalColor=total>0?'#007A3E':total<0?'#C62828':'#999';
+  return `<div class="fp-hdr">七、项目收益分析</div>
+  <div style="margin:0 14px 12px;padding:10px 14px;background:linear-gradient(135deg,#005A2D,#007A3E);border-radius:6px;">
+    <div style="font-size:10px;color:rgba(255,255,255,.65);margin-bottom:2px;">项目总收益（自动计算）</div>
+    <div style="font-size:20px;font-weight:800;color:#fff;">${totalStr}</div>
+    <div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;">= 各项收益之和 − 容量电费（扣减项）</div>
+  </div>
+  ${items.map((it,i)=>`
+  <div class="fp-sec" style="${it.deduct?'border-left:3px solid #FFCDD2;':'' }">
+    <div class="fp-sec-title" style="color:${it.deduct?'#C62828':'#004E28'};">
+      ${it.deduct?'⊖ ':'⊕ '}${it.label}${it.deduct?' （扣减项）':''}
+    </div>
+    ${fg('金额（万元/年）',`<input class="fi" type="number" placeholder="如：120.00"
+      value="${escAttr(it.amount)}"
+      oninput="D.s12.items[${i}].amount=this.value;refresh();refreshForm()"
+      style="border-color:${it.deduct?'#FFCDD2':''};">`)}
+    ${fg('备注说明',`<textarea class="fi ta sm" style="min-height:36px" placeholder="如：基于调度测算..."
+      oninput="D.s12.items[${i}].notes=this.value;refresh()">${escHtml(it.notes)}</textarea>`)}
+  </div>`).join('')}`;
+}
+
 function renderForm(idx){
-  const fns=[renderF0,renderFMenu,renderF1,renderF2,renderF3,renderF4,renderF8,renderF9,renderF11];
+  const fns=[renderF0,renderFMenu,renderF1,renderF2,renderF3,renderF4,renderF8,renderF9,renderF12,renderF11];
   return fns[idx]();
 }
 
@@ -1989,6 +2104,55 @@ function toggleArchived(){
   const t=document.querySelector('.proj-arch-title');
   g.style.display=archVisible?'grid':'none';
   t.textContent=(archVisible?'▲':'▼')+' 已归档项目（点击'+(archVisible?'收起':'展开')+'）';
+}
+
+// ══════════════════════════════════════════════
+//  DATA EXPORT / IMPORT (便携备份)
+// ══════════════════════════════════════════════
+function exportData(){
+  const payload={
+    _app:'yichu-meeting-gen',
+    _version:'1.0',
+    exportedAt:new Date().toISOString(),
+    users:authUsers(),
+    projects:pmLoad()
+  };
+  const json=JSON.stringify(payload,null,2);
+  const blob=new Blob([json],{type:'application/json;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  const dateStr=new Date().toLocaleDateString('zh-CN').replace(/\//g,'-');
+  a.download=`储能项目数据备份_${dateStr}.json`;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function importData(){
+  const input=document.createElement('input');
+  input.type='file';input.accept='.json,application/json';
+  input.onchange=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const d=JSON.parse(ev.target.result);
+        if(d._app!=='yichu-meeting-gen'||!d.projects) throw new Error('不是有效的备份文件');
+        const uLen=(d.users||[]).length;
+        const pLen=(d.projects.projects||[]).length;
+        if(!confirm(`准备导入备份：\n👤 用户账号 ${uLen} 个\n📂 项目 ${pLen} 个\n\n⚠️ 将覆盖本设备所有现有数据，确认继续？`))return;
+        if(d.users) localStorage.setItem(AUTH_KEY,JSON.stringify(d.users));
+        pmSave(d.projects);
+        clearSession();
+        alert('✅ 导入成功！请用原账号重新登录。');
+        location.reload();
+      }catch(err){
+        alert('❌ 导入失败：'+err.message);
+      }
+    };
+    reader.readAsText(file,'utf-8');
+  };
+  input.click();
 }
 
 // ══════════════════════════════════════════════
