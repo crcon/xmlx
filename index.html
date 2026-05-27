@@ -1375,19 +1375,31 @@ function renderS12(){
   const totalStr=total?total.toFixed(2):'—';
   const totalColor=total>0?'#007A3E':total<0?'#C62828':'#999';
 
-  const rows=items.map((it,i)=>{
-    const amt=parseFloat(it.amount)||0;
-    const hasVal=it.amount!=='';
+  // ① 金额为空或为 0 时，自动隐藏该行
+  const visItems=items.filter(it=>{
+    const v=parseFloat(it.amount);
+    return it.amount!==''&&!isNaN(v)&&v!==0;
+  });
+
+  const rows=visItems.map(it=>{
+    const amt=parseFloat(it.amount);
     return `<tr style="${it.deduct?'background:#FFF8F8;':''}">
       <td class="vc" style="white-space:nowrap;font-size:9.5px;font-weight:${it.deduct?'600':'400'};color:${it.deduct?'#C62828':'#333'};padding:5px 10px;">
-        ${it.label}${it.deduct?' <span style="font-size:8px;background:#FFEBEE;color:#C62828;border-radius:2px;padding:1px 4px;margin-left:4px;">扣减</span>':''}
+        ${escHtml(it.label)}${it.deduct?' <span style="font-size:8px;background:#FFEBEE;color:#C62828;border-radius:2px;padding:1px 4px;margin-left:4px;">扣减</span>':''}
       </td>
       <td class="vc" style="white-space:nowrap;text-align:right;font-size:10px;font-weight:600;padding:5px 14px;color:${it.deduct?'#C62828':'#222'};">
-        ${hasVal?(it.deduct?'− ':'+ ')+Math.abs(amt).toFixed(2):'—'}
+        ${(it.deduct?'− ':'+ ')+Math.abs(amt).toFixed(2)}
       </td>
-      <td class="vc" style="font-size:8.5px;color:#777;padding:5px 10px;">${it.notes||''}</td>
+      <td class="vc" style="font-size:8.5px;color:#777;padding:5px 10px;">${escHtml(it.notes||'')}</td>
     </tr>`;
   }).join('');
+
+  const emptyRow=visItems.length===0
+    ?`<tr><td colspan="3" style="text-align:center;color:#CCC;font-size:9px;padding:18px;">暂无收益数据，请在右侧填写</td></tr>`:'';
+
+  // formula line: only non-zero items
+  const incParts=items.filter(it=>!it.deduct&&parseFloat(it.amount)).map(it=>`+${parseFloat(it.amount).toFixed(2)}`).join(' ');
+  const dedParts=items.filter(it=>it.deduct&&parseFloat(it.amount)).map(it=>` − ${parseFloat(it.amount).toFixed(2)}`).join('');
 
   return shell('七','项目收益分析',`
   <div style="display:flex;flex-direction:column;gap:10px;height:calc(100% - 8px);">
@@ -1400,15 +1412,12 @@ function renderS12(){
           ${totalStr} <span style="font-size:13px;font-weight:400;opacity:.8;">万元</span>
         </div>
       </div>
-      <div style="text-align:right;">
-        <div style="font-size:8px;color:rgba(255,255,255,.5);margin-bottom:4px;">= 各项收益之和 − 容量电费</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.7);white-space:nowrap;">
-          ${items.filter(it=>!it.deduct&&it.amount).map(it=>`+${parseFloat(it.amount).toFixed(2)}`).join(' ')}
-          ${items.filter(it=>it.deduct&&it.amount).map(it=>` − ${parseFloat(it.amount).toFixed(2)}`).join('')}
-        </div>
+      <div style="text-align:right;max-width:45%;">
+        <div style="font-size:8px;color:rgba(255,255,255,.5);margin-bottom:4px;">= 各项收益之和 − 扣减项</div>
+        <div style="font-size:9.5px;color:rgba(255,255,255,.7);word-break:break-all;">${incParts}${dedParts}</div>
       </div>
     </div>
-    <!-- 明细表：table-layout:auto 让列宽自适应内容 -->
+    <!-- 明细表（金额为 0 或空的行自动隐藏）-->
     <div style="flex:1;overflow:auto;">
       <table class="tbl" style="font-size:10px;table-layout:auto;width:auto;min-width:100%;">
         <thead>
@@ -1418,7 +1427,7 @@ function renderS12(){
             <th>备注说明</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows||emptyRow}</tbody>
         <tfoot>
           <tr style="background:#F2FAF5;">
             <td style="white-space:nowrap;font-weight:700;font-size:10px;padding:6px 10px;color:#005A2D;">合计</td>
@@ -1901,25 +1910,39 @@ function renderF12(){
   const items=D.s12.items||[];
   const total=calcRevenueTotal();
   const totalStr=total?total.toFixed(2)+'  万元/年':'待填写';
-  const totalColor=total>0?'#007A3E':total<0?'#C62828':'#999';
   return `<div class="fp-hdr">七、项目收益分析</div>
   <div style="margin:0 14px 12px;padding:10px 14px;background:linear-gradient(135deg,#005A2D,#007A3E);border-radius:6px;">
     <div style="font-size:10px;color:rgba(255,255,255,.65);margin-bottom:2px;">项目总收益（自动计算）</div>
     <div style="font-size:20px;font-weight:800;color:#fff;">${totalStr}</div>
-    <div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;">= 各项收益之和 − 容量电费（扣减项）</div>
+    <div style="font-size:9px;color:rgba(255,255,255,.5);margin-top:2px;">= 各项收益之和 − 扣减项 &nbsp;·&nbsp; 金额为空/0 时幻灯片自动隐藏</div>
   </div>
   ${items.map((it,i)=>`
-  <div class="fp-sec" style="${it.deduct?'border-left:3px solid #FFCDD2;':'' }">
-    <div class="fp-sec-title" style="color:${it.deduct?'#C62828':'#004E28'};">
-      ${it.deduct?'⊖ ':'⊕ '}${it.label}${it.deduct?' （扣减项）':''}
+  <div class="fp-sec" style="${it.deduct?'border-left:3px solid #FFCDD2;':''}">
+    <div class="fp-sec-title" style="display:flex;align-items:center;gap:6px;justify-content:space-between;">
+      <span style="color:${it.deduct?'#C62828':'#004E28'};display:flex;align-items:center;gap:5px;flex:1;min-width:0;">
+        ${it.deduct?'⊖':'⊕'}
+        ${it.custom
+          ? `<input class="fi" value="${escAttr(it.label)}" placeholder="收益项目名称"
+               style="flex:1;padding:3px 7px;font-size:10.5px;font-weight:700;color:${it.deduct?'#C62828':'#004E28'};"
+               oninput="D.s12.items[${i}].label=this.value;refresh();">`
+          : `<span>${escHtml(it.label)}${it.deduct?' <span style="font-size:8px;opacity:.7;">（扣减项）</span>':''}</span>`}
+      </span>
+      ${it.custom?`<button class="del-btn" title="删除此项" onclick="delRevenueItem(${i})">×</button>`:''}
     </div>
+    ${it.custom?fg('类型',`<select class="fi" onchange="D.s12.items[${i}].deduct=this.value==='deduct';refresh();refreshForm()">
+      <option value="income" ${!it.deduct?'selected':''}>⊕ 收益项（正数计入总收益）</option>
+      <option value="deduct" ${it.deduct?'selected':''}>⊖ 扣减项（从总收益中扣除）</option>
+    </select>`):''}
     ${fg('金额（万元/年）',`<input class="fi" type="number" placeholder="如：120.00"
       value="${escAttr(it.amount)}"
       oninput="D.s12.items[${i}].amount=this.value;refresh();refreshForm()"
       style="border-color:${it.deduct?'#FFCDD2':''};">`)}
     ${fg('备注说明',`<textarea class="fi ta sm" style="min-height:36px" placeholder="如：基于调度测算..."
       oninput="D.s12.items[${i}].notes=this.value;refresh()">${escHtml(it.notes)}</textarea>`)}
-  </div>`).join('')}`;
+  </div>`).join('')}
+  <div class="fp-sec">
+    <button class="add-btn" onclick="addRevenueItem()">＋ 添加收益类型</button>
+  </div>`;
 }
 
 function renderForm(idx){
@@ -1959,6 +1982,17 @@ function addNoteItem(){if(!D.s4.noteItems)D.s4.noteItems=[];D.s4.noteItems.push(
 function delNoteItem(i){D.s4.noteItems.splice(i,1);refreshForm();refresh();}
 function addIssue(){D.s11.issues.push({title:'',content:'',problem:'',measure:''});refreshForm();refresh();}
 function delIssue(i){D.s11.issues.splice(i,1);refreshForm();refresh();}
+// ── Revenue items (s12) ──
+function addRevenueItem(){
+  if(!D.s12.items) D.s12.items=[];
+  D.s12.items.push({label:'自定义收益',amount:'',notes:'',deduct:false,custom:true});
+  refreshForm();refresh();
+}
+function delRevenueItem(i){
+  if(!D.s12.items[i]||!D.s12.items[i].custom) return;
+  D.s12.items.splice(i,1);
+  refreshForm();refresh();
+}
 
 // ── Custom slide mutations ──
 function addCustomSlide(){
