@@ -567,7 +567,8 @@ const D = {
     steps:['双方签署框架协议','深圳易储支付履约保证金'],
     consultType:'按MWh计费',
     consultRate:'',consultMWh:'',
-    equityEasyStorage:'90',equityPartner:'10',notes:''
+    equityEasyStorage:'90',equityPartner:'10',notes:'',
+    partnerName:'',partnerBg:''
   },
   s9:{
     rows:[
@@ -591,6 +592,7 @@ const D = {
   imagePos:{},   // {imgKey:{x,y,w,h}} in % of .sl-body dimensions (also stores dtb positions)
   customSlides:[], // [{id,title,textBlocks:[{id,heading,content,x,y,w,h}],extraImages:[{key,url,x,y,w,h,caption}]}]
   slideOrder:[],   // ordered array of content slide IDs (empty = use default order)
+  slideExtras:{},  // {slideId:{textBlocks:[{id,heading,content}], images:[{key,url,caption,x,y,w,h}]}}
   s12:{
     items:[
       {label:'现货收益', amount:'', notes:'', deduct:false},
@@ -619,8 +621,9 @@ const FIXED_SLIDES_BASE = [
   {id:'s11',  name:'存在的问题及应对措施',       short:'问题措施',desc:'风险分析·解决方案'}
 ];
 const CN_NUMS=['一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六'];
-// Current slide's dynamic number — set by renderSlide() before calling each renderer
+// Current slide's dynamic number and id — set by renderSlide() before calling each renderer
 let _curSlideNum='';
+let _curSlideId='';
 
 function getSlides(){
   const cs=(D.customSlides||[]);
@@ -793,7 +796,7 @@ function shell(num,title,body){
       <div class="sl-meta">${projectShortName()}<br>机密 · 上会材料</div>
     </div>
     <div class="sl-hdr-line"></div>
-    <div class="sl-body">${body}</div>
+    <div class="sl-body">${body}${renderSlideExtras(_curSlideId)}</div>
     <div class="sl-footer">第${num}页 &nbsp;|&nbsp; 深圳易储数智能源集团有限公司 &nbsp;|&nbsp; 机密文件</div>
   </div>`;
 }
@@ -819,6 +822,9 @@ function renderS0(){
     </div>
     <div style="font-size:10px;color:rgba(255,255,255,.5);">${d.dept||'项目开发部'}</div>
     <div class="cover-date">${d.reportDate||'——'}</div>
+    <div class="sl-body" style="position:absolute;inset:0;padding:0;overflow:visible;background:none;flex:unset;pointer-events:none;">
+      ${renderSlideExtras('s0')}
+    </div>
   </div>`;
 }
 
@@ -836,6 +842,7 @@ function renderSMenu(){
     </div>
     <div class="sl-hdr-line"></div>
     <div class="sl-body" style="display:flex;align-items:flex-start;overflow:auto;">
+      ${renderSlideExtras('sMenu')}
       <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;align-content:start;">
         ${contentSlides.map((s,i)=>`
           <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;
@@ -1242,29 +1249,48 @@ function renderS8(){
   const d=D.s8;
   const consultTotal=calcConsult(d.consultRate,d.consultMWh);
   const steps=d.steps.filter(s=>s.trim());
+  const hasPartner=d.partnerName||d.partnerBg;
   return shell(_curSlideNum,'合作思路及合作条件',`
-  <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px;height:calc(100% - 8px);">
-    <div>
-      <div style="font-size:10px;font-weight:700;color:#007A3E;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid #D5E6DC;">合作思路</div>
-      ${steps.length?steps.map((s,i)=>`
-        <div class="coop-step">
-          <div class="step-num">${i+1}</div>
-          <div class="step-text">${s}</div>
-        </div>`).join('')
-      :`<div style="color:#C0C0C0;font-size:10px;font-style:italic;">请填写合作步骤...</div>`}
+  <div style="display:flex;flex-direction:column;gap:12px;height:calc(100% - 8px);">
+    <!-- 上方：合作思路 + 合作条件 并排 -->
+    <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px;flex:${hasPartner?'0 0 auto':'1'};">
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#007A3E;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid #D5E6DC;">合作思路</div>
+        ${steps.length?steps.map((s,i)=>`
+          <div class="coop-step">
+            <div class="step-num">${i+1}</div>
+            <div class="step-text">${s}</div>
+          </div>`).join('')
+        :`<div style="color:#C0C0C0;font-size:10px;font-style:italic;">请填写合作步骤...</div>`}
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#007A3E;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid #D5E6DC;">合作条件</div>
+        <table class="tbl" style="font-size:10px;">
+          <tr><td class="lc">合作方式</td><td class="vc">${v(d.consultType)}</td></tr>
+          <tr><td class="lc">单价</td><td class="vc">${d.consultRate?d.consultRate+' 元/Wh':'—'}</td></tr>
+          <tr><td class="lc">储能容量</td><td class="vc">${d.consultMWh?d.consultMWh+' MWh':'—'}</td></tr>
+          <tr><td class="lc" style="color:#007A3E;font-weight:700;">服务费合计</td><td class="vc" style="color:#007A3E;font-weight:700;">${consultTotal?consultTotal+'万元':'—'}</td></tr>
+          <tr><td class="lc">易储持股</td><td class="vc">${d.equityEasyStorage?d.equityEasyStorage+'%':'—'}</td></tr>
+          <tr><td class="lc">他方持股</td><td class="vc">${d.equityPartner?d.equityPartner+'%':'—'}</td></tr>
+        </table>
+        ${d.notes?`<div class="info-block" style="margin-top:8px;"><div class="info-block-body" style="font-size:9px;">${d.notes}</div></div>`:''}
+      </div>
     </div>
-    <div>
-      <div style="font-size:10px;font-weight:700;color:#007A3E;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid #D5E6DC;">合作条件</div>
-      <table class="tbl" style="font-size:10px;">
-        <tr><td class="lc">合作方式</td><td class="vc">${v(d.consultType)}</td></tr>
-        <tr><td class="lc">单价</td><td class="vc">${d.consultRate?d.consultRate+' 元/Wh':'—'}</td></tr>
-        <tr><td class="lc">储能容量</td><td class="vc">${d.consultMWh?d.consultMWh+' MWh':'—'}</td></tr>
-        <tr><td class="lc" style="color:#007A3E;font-weight:700;">服务费合计</td><td class="vc" style="color:#007A3E;font-weight:700;">${consultTotal?consultTotal+'万元':'—'}</td></tr>
-        <tr><td class="lc">易储持股</td><td class="vc">${d.equityEasyStorage?d.equityEasyStorage+'%':'—'}</td></tr>
-        <tr><td class="lc">他方持股</td><td class="vc">${d.equityPartner?d.equityPartner+'%':'—'}</td></tr>
-      </table>
-      ${d.notes?`<div class="info-block" style="margin-top:8px;"><div class="info-block-body" style="font-size:9px;">${d.notes}</div></div>`:''}
-    </div>
+    <!-- 下方：合作方介绍 -->
+    ${hasPartner?`
+    <div style="flex:1;min-height:0;">
+      <div style="font-size:10px;font-weight:700;color:#007A3E;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid #D5E6DC;">合作方介绍</div>
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        ${d.partnerName?`<div style="flex-shrink:0;min-width:90px;max-width:110px;background:linear-gradient(135deg,#007A3E,#00963A);border-radius:6px;padding:10px 12px;color:#fff;text-align:center;">
+          <div style="font-size:9px;opacity:.7;margin-bottom:4px;">合作方</div>
+          <div style="font-size:11px;font-weight:700;line-height:1.4;">${escHtml(d.partnerName)}</div>
+        </div>`:''}
+        ${d.partnerBg?`<div style="flex:1;font-size:9.5px;color:#333;line-height:1.75;background:#F5FAF7;border-left:3px solid #007A3E;border-radius:0 5px 5px 0;padding:9px 12px;">${escHtml(d.partnerBg)}</div>`:''}
+      </div>
+    </div>`
+    :`<div style="flex:1;display:flex;align-items:center;justify-content:center;">
+      <div style="color:#D0E0D8;font-size:10px;font-style:italic;text-align:center;">可在右侧填写「合作方介绍」，内容将显示于此区域</div>
+    </div>`}
   </div>`);
 }
 
@@ -1502,6 +1528,30 @@ function renderS12(){
 // ══════════════════════════════════════════════
 //  CUSTOM SLIDE — renderer & form
 // ══════════════════════════════════════════════
+// ── Per-slide supplemental draggable extras (text blocks + images for fixed slides) ──
+function renderSlideExtras(slideId){
+  if(!slideId) return '';
+  const ex=D.slideExtras&&D.slideExtras[slideId];
+  if(!ex) return '';
+  const rhHtml=RH_DIRS.map(d=>`<div class="rh rh-${d}" data-dir="${d}"></div>`).join('');
+  const blocks=(ex.textBlocks||[]).map(tb=>{
+    const key='ext_'+slideId+'_'+tb.id;
+    const p=getImgPos(key,tb.x!==undefined?tb.x:5,tb.y!==undefined?tb.y:10,tb.w||40,tb.h||20);
+    return `<div class="dtb" id="dtb_ext_${tb.id}"
+      data-key="${key}" data-dx="${tb.x!==undefined?tb.x:5}" data-dy="${tb.y!==undefined?tb.y:10}" data-dw="${tb.w||40}" data-dh="${tb.h||20}"
+      style="left:${p.x}%;top:${p.y}%;width:${p.w}%;height:${p.h}%;pointer-events:auto;">${rhHtml}
+      <div class="dtb-inner">
+        ${tb.heading?`<div class="dtb-heading">${escHtml(tb.heading)}</div>`:''}
+        <div class="dtb-content">${escHtml(tb.content||'')}</div>
+      </div>
+    </div>`;
+  });
+  const imgs=(ex.images||[]).map(img=>
+    draggableImg(img.key,img.url,img.x!==undefined?img.x:5,img.y!==undefined?img.y:55,img.w||40,img.h||38,img.caption||'图片')
+  );
+  return blocks.join('')+imgs.join('');
+}
+
 function renderCustomSlide(cs,numLabel){
   if(!cs) return '<div>错误：自定义页面数据丢失</div>';
   const rhHtml=RH_DIRS.map(d=>`<div class="rh rh-${d}" data-dir="${d}"></div>`).join('');
@@ -1592,10 +1642,56 @@ function renderFCustom(cs){
     </div>`;
 }
 
+// ── Per-slide extras form panel section ──
+function renderFormExtras(slideId){
+  if(!slideId) return '';
+  const ex=(D.slideExtras&&D.slideExtras[slideId])||{textBlocks:[],images:[]};
+  const tbRows=(ex.textBlocks||[]).map((tb,i)=>`
+    <div class="dyn-row">
+      <div class="dyn-row-hdr">
+        <span class="dyn-row-lbl">文本块 ${i+1} <span style="font-size:9px;color:#aaa;">（可拖动/调整大小）</span></span>
+        <button class="del-btn" onclick="delExtraTB('${slideId}',${i})">×</button>
+      </div>
+      ${fg('标题（留空则不显示）',`<input class="fi" placeholder="标题..." value="${escAttr(tb.heading||'')}"
+        oninput="updExtraTB('${slideId}',${i},'heading',this.value)">`)}
+      ${fg('正文内容',`<textarea class="fi ta sm" style="min-height:60px" placeholder="正文内容..."
+        oninput="updExtraTB('${slideId}',${i},'content',this.value)">${escHtml(tb.content||'')}</textarea>`)}
+    </div>`).join('');
+  const imgRows=(ex.images||[]).map((img,i)=>`
+    <div class="dyn-row">
+      <div class="dyn-row-hdr">
+        <span class="dyn-row-lbl">图片 ${i+1} <span style="font-size:9px;color:#aaa;">（可拖动/调整大小）</span></span>
+        <button class="del-btn" onclick="delExtraImg('${slideId}',${i})">×</button>
+      </div>
+      <div class="upload-btn ${img.url?'has-img':''}"
+        onclick="trigExtraImg('${slideId}',${i})"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="event.preventDefault();this.classList.remove('drag-over');handleExtraImgDrop(event,'${slideId}',${i})">
+        ${img.url?`<img class="upload-preview" src="${img.url}"><div style="font-size:9px;color:#007A3E;margin-top:3px;">✅ 已上传 — 点击或拖入更换</div>`
+                 :`<div>📁 点击上传 / 直接拖入图片</div>`}
+      </div>
+      <input type="file" accept="image/*" id="extimg_${slideId}_${i}" style="display:none"
+        onchange="handleExtraImgFile('${slideId}',${i},this)">
+    </div>`).join('');
+  return `<div class="fp-sec" style="border-top:2px dashed #C8E6D8;margin-top:10px;padding-top:10px;">
+    <div class="fp-sec-title" style="color:#007A3E;display:flex;align-items:center;gap:6px;">
+      <span>📎 补充内容</span>
+      <span style="font-size:9px;font-weight:400;color:#888;">（叠加在本页幻灯片上，可自由拖动）</span>
+    </div>
+    <div style="font-size:9px;color:#888;margin-bottom:10px;">添加文本块或图片，叠加在现有内容之上，支持拖动和调整大小</div>
+    ${tbRows}
+    <button class="add-btn" onclick="addExtraTB('${slideId}')">＋ 添加文本块</button>
+    ${imgRows?`<div style="margin-top:8px;">${imgRows}</div>`:''}
+    <button class="add-btn" style="margin-top:8px;" onclick="addExtraImg('${slideId}')">＋ 添加图片</button>
+  </div>`;
+}
+
 function renderSlide(idx){
   const slides=getSlides();
   const s=slides[idx]; if(!s) return '';
   _curSlideNum=s.num; // let every renderer read the live number
+  _curSlideId=s.id;
   const map={s0:renderS0,sMenu:renderSMenu,s1:renderS1,s2:renderS2,s3:renderS3,
              s4:renderS4,s8:renderS8,s9:renderS9,s12:renderS12,s11:renderS11};
   if(map[s.id]) return map[s.id]();
@@ -1882,6 +1978,10 @@ function renderF8(){
     fg('易储持股比例 (%)',fi('equityEasyStorage','s8','如：90','number')) +
     fg('他方持股比例 (%)',fi('equityPartner','s8','如：10','number')) +
     fg('补充说明',ta('notes','s8','履约保证金、股权交割条件等...',3))
+  )}
+  ${sec('合作方介绍',
+    fg('合作方名称',fi('partnerName','s8','如：XX能源投资有限公司')) +
+    fg('合作方背景介绍',ta('partnerBg','s8','如：公司成立于…，注册资本…，核心业务…，在本地区拥有…',5))
   )}`;
 }
 
@@ -2018,9 +2118,13 @@ function renderForm(idx){
   const s=slides[idx]; if(!s) return '';
   const map={s0:renderF0,sMenu:renderFMenu,s1:renderF1,s2:renderF2,s3:renderF3,
              s4:renderF4,s8:renderF8,s9:renderF9,s12:renderF12,s11:renderF11};
-  if(map[s.id]) return map[s.id]();
-  if(s.isCustom) return renderFCustom(s.customData);
-  return '<div class="fp-sec"><div class="fp-sec-title">无表单</div></div>';
+  let html='';
+  if(map[s.id]) html=map[s.id]();
+  else if(s.isCustom) return renderFCustom(s.customData); // custom slides have their own system
+  else html='<div class="fp-sec"><div class="fp-sec-title">无表单</div></div>';
+  // Append per-slide supplemental content section for all fixed slides
+  html+=renderFormExtras(s.id);
+  return html;
 }
 
 // ══════════════════════════════════════════════
@@ -2044,6 +2148,64 @@ function addSh(){D.s7.shareholders.push({name:'',ratio:'',background:''});refres
 function delSh(i){D.s7.shareholders.splice(i,1);refreshForm();refresh();}
 function addStep(){D.s8.steps.push('');refreshForm();refresh();}
 function delStep(i){D.s8.steps.splice(i,1);refreshForm();refresh();}
+
+// ── Per-slide extras mutation helpers ──
+function _getOrCreateExtras(slideId){
+  if(!D.slideExtras) D.slideExtras={};
+  if(!D.slideExtras[slideId]) D.slideExtras[slideId]={textBlocks:[],images:[]};
+  return D.slideExtras[slideId];
+}
+function addExtraTB(slideId){
+  const ex=_getOrCreateExtras(slideId);
+  ex.textBlocks.push({id:'etb_'+Date.now(),heading:'',content:''});
+  refresh();refreshForm();
+}
+function delExtraTB(slideId,idx){
+  const ex=_getOrCreateExtras(slideId);
+  ex.textBlocks.splice(idx,1);
+  refresh();refreshForm();
+}
+function updExtraTB(slideId,idx,field,val){
+  const ex=_getOrCreateExtras(slideId);
+  if(ex.textBlocks[idx]) ex.textBlocks[idx][field]=val;
+  refresh();
+}
+function addExtraImg(slideId){
+  const ex=_getOrCreateExtras(slideId);
+  const key='extimg_'+slideId+'_'+Date.now();
+  ex.images.push({key,url:'',caption:'图片'});
+  refresh();refreshForm();
+}
+function delExtraImg(slideId,idx){
+  const ex=_getOrCreateExtras(slideId);
+  ex.images.splice(idx,1);
+  refresh();refreshForm();
+}
+function trigExtraImg(slideId,idx){
+  const el=document.getElementById('extimg_'+slideId+'_'+idx);
+  if(el) el.click();
+}
+function handleExtraImgFile(slideId,idx,input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const ex=_getOrCreateExtras(slideId);
+    if(ex.images[idx]) ex.images[idx].url=ev.target.result;
+    refresh();refreshForm();
+  };
+  r.readAsDataURL(file);
+}
+function handleExtraImgDrop(e,slideId,idx){
+  const file=e.dataTransfer&&e.dataTransfer.files[0];
+  if(!file||!file.type.startsWith('image/')) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const ex=_getOrCreateExtras(slideId);
+    if(ex.images[idx]) ex.images[idx].url=ev.target.result;
+    refresh();refreshForm();
+  };
+  r.readAsDataURL(file);
+}
 function addCostRow(){D.s9.rows.push({seq:String(D.s9.rows.length+1),name:'',scale:'',amount:''});refreshForm();refresh();}
 function delCostRow(i){D.s9.rows.splice(i,1);refreshForm();refresh();}
 function addNoteItem(){if(!D.s4.noteItems)D.s4.noteItems=[];D.s4.noteItems.push({title:'',content:''});refreshForm();refresh();}
