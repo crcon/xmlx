@@ -1334,30 +1334,56 @@ function renderS10(){
 
 function renderS11(){
   const d=D.s11;
-  // support both old {problem,measure} and new {title,content} structures
-  const issues=d.issues.filter(i=>i.title||i.content||i.problem||i.measure);
+  const issues=(d.issues||[]);
+
+  const rows=issues.map((iss,i)=>{
+    const prob=iss.problem||iss.title||'';
+    const meas=iss.measure||iss.content||'';
+    if(!prob&&!meas) return '';
+    const bg=i%2===0?'#fff':'#F5FAF7';
+    return `<tr style="background:${bg};">
+      <td style="text-align:center;font-size:11px;font-weight:800;color:#007A3E;
+        width:6%;padding:7px 6px;border:1px solid #E0EAE5;vertical-align:top;">${i+1}</td>
+      <td style="width:44%;padding:7px 10px;border:1px solid #E0EAE5;vertical-align:top;
+        font-size:9.5px;color:#333;line-height:1.6;">
+        ${prob?escHtml(prob):'<span style="color:#CCC">—</span>'}
+      </td>
+      <td style="width:50%;padding:7px 10px;border:1px solid #E0EAE5;vertical-align:top;
+        font-size:9.5px;color:#1a3d2a;line-height:1.6;background:${bg==='#fff'?'#FAFFFE':'#EEF7F2'};">
+        ${meas?escHtml(meas):'<span style="color:#CCC">—</span>'}
+      </td>
+    </tr>`;
+  }).filter(Boolean).join('');
+
+  const emptyRow=`<tr><td colspan="3" style="text-align:center;color:#CCC;font-size:9px;
+    padding:22px;font-style:italic;">请在右侧填写问题清单</td></tr>`;
+
   return shell('八','存在的问题及应对措施',`
-  <div style="height:calc(100% - 8px);overflow:auto;">
-    ${issues.length?issues.map((iss,i)=>{
-      const title=iss.title||(iss.problem?'存在的问题':'');
-      const content=iss.content||iss.measure||'';
-      const colors=[
-        {border:'#F5A623',bg:'#FFFBF0',tc:'#8B6000'},
-        {border:'#E57373',bg:'#FFF5F5',tc:'#B71C1C'},
-        {border:'#1E90FF',bg:'#F0F7FF',tc:'#003399'},
-        {border:'#B39DDB',bg:'#F5F0FF',tc:'#4527A0'},
-        {border:'#80CBC4',bg:'#E0F7FA',tc:'#006064'}
-      ];
-      const c=colors[i%colors.length];
-      return `<div class="policy-block" style="border-color:${c.border};background:${c.bg};margin-bottom:7px;">
-        <div class="policy-title" style="color:${c.tc};">【${i+1}】${title||'条目'}</div>
-        <div class="policy-content">${content||'—'}</div>
-      </div>`;
-    }).join('')
-    :`<div style="color:#C0C0C0;font-size:10px;text-align:center;padding:24px;font-style:italic;">请填写存在的问题及应对措施</div>`}
-    ${d.urgency?`<div class="policy-block" style="border-color:#F5A623;background:#FFFBF0;margin-top:6px;">
-      <div class="policy-title" style="color:#8B6000;">⚠ 需要解决及明确的问题</div>
-      <div class="policy-content">${d.urgency}</div>
+  <div style="display:flex;flex-direction:column;gap:8px;height:calc(100% - 8px);">
+    <div style="flex:1;overflow:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:10px;">
+        <thead>
+          <tr>
+            <th style="width:6%;text-align:center;background:#007A3E;color:#fff;
+              padding:7px 6px;font-size:9px;border:1px solid #005A2D;">序号</th>
+            <th style="width:44%;background:#005A2D;color:#fff;
+              padding:7px 12px;font-size:10px;font-weight:700;border:1px solid #004820;text-align:left;">
+              📌 进度安排及卡点
+            </th>
+            <th style="width:50%;background:#007A3E;color:#fff;
+              padding:7px 12px;font-size:10px;font-weight:700;border:1px solid #005A2D;text-align:left;">
+              ✅ 方案及措施
+            </th>
+          </tr>
+        </thead>
+        <tbody>${rows||emptyRow}</tbody>
+      </table>
+    </div>
+    ${d.urgency?`
+    <div style="flex-shrink:0;background:#FFFBF0;border:1px solid #F5C842;border-left:4px solid #F5A623;
+      border-radius:0 4px 4px 0;padding:7px 12px;">
+      <div style="font-size:9.5px;font-weight:700;color:#8B6000;margin-bottom:3px;">⚠ 需要解决及明确的问题</div>
+      <div style="font-size:9px;color:#5C4000;line-height:1.6;">${escHtml(d.urgency)}</div>
     </div>`:''}
   </div>`);
 }
@@ -1882,18 +1908,26 @@ function renderF10(){
 
 function renderF11(){
   return `<div class="fp-hdr">八、存在的问题及应对措施</div>
+  <div class="fp-sec" style="padding-bottom:6px;">
+    <div class="fp-sec-title">问题清单</div>
+    <div style="font-size:9px;color:#888;margin-bottom:8px;">每条对应表格一行：左栏「进度安排及卡点」，右栏「方案及措施」</div>
+  </div>
   ${D.s11.issues.map((iss,i)=>{
-    // support both old {problem,measure} and new {title,content}
-    const titleVal=iss.title!==undefined?iss.title:(iss.problem||'');
-    const contentVal=iss.content!==undefined?iss.content:(iss.measure||'');
+    const prob=iss.problem!==undefined?iss.problem:(iss.title||'');
+    const meas=iss.measure!==undefined?iss.measure:(iss.content||'');
     return `
   <div class="dyn-row">
-    <div class="dyn-row-hdr"><span class="dyn-row-lbl">条目 ${i+1}</span><button class="del-btn" onclick="delIssue(${i})">✕</button></div>
-    ${fg('标题',`<input class="fi" placeholder="如：存在的问题、应对措施..." value="${escAttr(titleVal)}" oninput="D.s11.issues[${i}].title=this.value;D.s11.issues[${i}].problem=this.value;refresh()">`)}
-    ${fg('内容',`<textarea class="fi ta sm" style="min-height:54px" placeholder="详细描述..." oninput="D.s11.issues[${i}].content=this.value;D.s11.issues[${i}].measure=this.value;refresh()">${escHtml(contentVal)}</textarea>`)}
+    <div class="dyn-row-hdr">
+      <span class="dyn-row-lbl">第 ${i+1} 条</span>
+      <button class="del-btn" onclick="delIssue(${i})">×</button>
+    </div>
+    ${fg('📌 进度安排及卡点',`<textarea class="fi ta sm" style="min-height:50px" placeholder="如：土地手续尚未完成，影响备案推进..."
+      oninput="D.s11.issues[${i}].problem=this.value;D.s11.issues[${i}].title=this.value;refresh()">${escHtml(prob)}</textarea>`)}
+    ${fg('✅ 方案及措施',`<textarea class="fi ta sm" style="min-height:50px" placeholder="如：已联系当地自然资源局，预计本月完成..."
+      oninput="D.s11.issues[${i}].measure=this.value;D.s11.issues[${i}].content=this.value;refresh()">${escHtml(meas)}</textarea>`)}
   </div>`;}).join('')}
-  <div style="padding:10px 14px;"><button class="add-btn" onclick="addIssue()">+ 添加条目</button></div>
-  ${sec('需决策事项',fg('需明确/决策的紧急事项',ta('urgency','s11','如：该项目参与竞企较多，需我司尽快决策...',3)))}`;
+  <div style="padding:6px 14px 12px;"><button class="add-btn" onclick="addIssue()">＋ 添加一条</button></div>
+  ${sec('需决策事项',fg('⚠ 需明确/决策的紧急问题（显示为底部警示栏）',ta('urgency','s11','如：该项目竞争较激烈，需我司尽快决策...',3)))}`;
 }
 
 function renderFMenu(){
