@@ -158,6 +158,17 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
 .rh-e{right:-5px;top:calc(50% - 5px);cursor:e-resize;}
 .rh-w{left:-5px;top:calc(50% - 5px);cursor:w-resize;}
 
+/* ── Draggable Text Block ── */
+.dtb{position:absolute;cursor:move;user-select:none;z-index:20;overflow:visible;box-sizing:border-box;}
+.dtb:hover .rh,.dtb.dtb-active .rh{opacity:1;}
+.dtb.dtb-active .dtb-inner{box-shadow:0 4px 20px rgba(0,122,62,.25);}
+.dtb-inner{background:#F5FBF7;border-left:3px solid #007A3E;border-radius:0 4px 4px 0;
+  padding:7px 10px;height:100%;box-sizing:border-box;overflow:hidden;
+  border:1px solid #D5E6DC;border-left-width:3px;}
+.dtb:hover .dtb-inner{box-shadow:0 2px 10px rgba(0,122,62,.15);}
+.dtb-heading{font-size:10px;font-weight:700;color:#005A2D;margin-bottom:3px;line-height:1.45;}
+.dtb-content{font-size:9px;color:#555;line-height:1.6;white-space:pre-wrap;}
+
 /* Cooperation steps */
 .coop-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;}
 .step-num{min-width:20px;height:20px;border-radius:50%;background:#007A3E;color:#fff;
@@ -573,7 +584,8 @@ const D = {
     issues:[{problem:'',measure:''}],
     urgency:''
   },
-  imagePos:{},   // {imgKey:{x,y,w,h}} in % of .sl-body dimensions
+  imagePos:{},   // {imgKey:{x,y,w,h}} in % of .sl-body dimensions (also stores dtb positions)
+  customSlides:[], // [{id,title,textBlocks:[{id,heading,content,x,y,w,h}],extraImages:[{key,url,x,y,w,h,caption}]}]
   s12:{
     items:[
       {label:'现货收益', amount:'', notes:'', deduct:false},
@@ -587,18 +599,46 @@ const D = {
   }
 };
 
-const SLIDES = [
-  {id:'s0',   num:'封面', name:'封面',                     short:'封面'},
-  {id:'sMenu',num:'目录', name:'目录',                     short:'目录'},
-  {id:'s1',   num:'一',   name:'项目基本情况',             short:'基本情况'},
-  {id:'s2',   num:'二',   name:'政策信息',                 short:'政策信息'},
-  {id:'s3',   num:'三',   name:'项目概述',                 short:'项目概述'},
-  {id:'s4',   num:'四',   name:'电力接入与周边场站情况',   short:'电力接入'},
-  {id:'s8',   num:'五',   name:'合作思路及合作条件',       short:'合作思路'},
-  {id:'s9',   num:'六',   name:'项目经济性分析（费用）',   short:'成本分析'},
-  {id:'s12',  num:'七',   name:'项目收益分析',             short:'收益分析'},
-  {id:'s11',  num:'八',   name:'存在的问题及应对措施',     short:'问题措施'}
+// Fixed slide definitions (without runtime numbering)
+const FIXED_SLIDES_BASE = [
+  {id:'s0',   name:'封面',                       short:'封面',    desc:''},
+  {id:'sMenu',name:'目录',                       short:'目录',    desc:''},
+  {id:'s1',   name:'项目基本情况',               short:'基本情况',desc:'地址·容量·土地·接入·建设计划'},
+  {id:'s2',   name:'政策信息',                   short:'政策信息',desc:'国家及地方政策支持'},
+  {id:'s3',   name:'项目概述',                   short:'项目概述',desc:'地址·地块·土地性质·区位图'},
+  {id:'s4',   name:'电力接入与周边场站情况',     short:'电力接入',desc:'变电站·电压等级·外线距离'},
+  {id:'s8',   name:'合作思路及合作条件',         short:'合作思路',desc:'合作步骤·资源费·股权结构'},
+  {id:'s9',   name:'项目经济性分析（费用）',     short:'成本分析',desc:'投资成本·费用明细'},
+  {id:'s12',  name:'项目收益分析',               short:'收益分析',desc:'现货·调频·调峰·容量电价·总收益'},
+  // ← custom slides inserted here at runtime
+  {id:'s11',  name:'存在的问题及应对措施',       short:'问题措施',desc:'风险分析·解决方案'}
 ];
+const CN_NUMS=['一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六'];
+
+function getSlides(){
+  const cs=(D.customSlides||[]);
+  const result=[];
+  let numIdx=0; // index into CN_NUMS for content slides
+  for(let i=0;i<FIXED_SLIDES_BASE.length-1;i++){
+    const s=FIXED_SLIDES_BASE[i];
+    const isContent=!['s0','sMenu'].includes(s.id);
+    result.push({...s, num:isContent?CN_NUMS[numIdx++]:(s.id==='s0'?'封面':'目录'), isFixed:true});
+  }
+  // insert custom slides before last fixed (s11)
+  for(const c of cs){
+    result.push({
+      id:c.id, num:CN_NUMS[numIdx++],
+      name:c.title||'自定义页面',
+      short:(c.title||'自定义').slice(0,5),
+      desc:c.textBlocks&&c.textBlocks[0]&&c.textBlocks[0].heading?c.textBlocks[0].heading.slice(0,16):'自定义内容',
+      isCustom:true, customData:c
+    });
+  }
+  // last fixed slide (s11)
+  const last=FIXED_SLIDES_BASE[FIXED_SLIDES_BASE.length-1];
+  result.push({...last, num:CN_NUMS[numIdx++], isFixed:true});
+  return result;
+}
 
 let curIdx=0, pmIdx=0;
 
@@ -670,7 +710,8 @@ function initImgDrag(){
   const canvas=$('slideCanvas');
   canvas.addEventListener('mousedown',function(e){
     const rh=e.target.closest('.rh');
-    const el=e.target.closest('.dimg');
+    // Handle both .dimg (images) and .dtb (text blocks)
+    const el=e.target.closest('.dimg')||e.target.closest('.dtb');
     if(!el) return;
     const body=el.closest('.sl-body');
     if(!body) return;
@@ -680,7 +721,7 @@ function initImgDrag(){
       parseFloat(el.dataset.dx),parseFloat(el.dataset.dy),
       parseFloat(el.dataset.dw),parseFloat(el.dataset.dh));
     _ds={key,br,el,mx:e.clientX,my:e.clientY,p0:{...p},dir:rh?rh.dataset.dir:'move'};
-    el.classList.add('dimg-active');
+    el.classList.add(el.classList.contains('dimg')?'dimg-active':'dtb-active');
     e.preventDefault();e.stopPropagation();
   });
   document.addEventListener('mousemove',function(e){
@@ -702,7 +743,11 @@ function initImgDrag(){
     D.imagePos[key]={x,y,w,h};
   });
   document.addEventListener('mouseup',function(){
-    if(_ds){_ds.el.classList.remove('dimg-active');_ds=null;saveCurrentProject();}
+    if(_ds){
+      _ds.el.classList.remove('dimg-active');
+      _ds.el.classList.remove('dtb-active');
+      _ds=null;saveCurrentProject();
+    }
   });
 }
 
@@ -745,17 +790,11 @@ function renderS0(){
 }
 
 function renderSMenu(){
-  const contentSlides=[
-    {num:'一', name:'项目基本情况',           desc:'地址·容量·土地·接入·建设计划'},
-    {num:'二', name:'政策信息',               desc:'国家及地方政策支持'},
-    {num:'三', name:'项目概述',               desc:'地址·地块·土地性质·区位图'},
-    {num:'四', name:'电力接入与周边场站情况', desc:'变电站·电压等级·外线距离'},
-    {num:'五', name:'合作思路及合作条件',     desc:'合作步骤·资源费·股权结构'},
-    {num:'六', name:'项目经济性分析（费用）', desc:'投资成本·费用明细'},
-    {num:'七', name:'项目收益分析',           desc:'现货·调频·调峰·容量电价·总收益'},
-    {num:'八', name:'存在的问题及应对措施',   desc:'风险分析·解决方案'},
-  ];
+  // Dynamic: reads getSlides() so custom slides automatically appear in TOC
+  const contentSlides=getSlides().filter(s=>!['s0','sMenu'].includes(s.id));
+  const colors=['#007A3E','#00963A','#34A85A','#5BBE78','#82CE98','#A8DDB5','#C8EDD6','#B0D4BE','#90C8A8','#6EB892','#50A87C','#3A9468'];
   const pname=projectShortName();
+  // Use 2 columns, but if >10 items allow scrolling
   return `<div style="display:flex;flex-direction:column;height:100%;background:#fff;">
     <div class="sl-hdr">
       <div class="sl-badge" style="font-size:10px;letter-spacing:-.5px;">目录</div>
@@ -763,20 +802,20 @@ function renderSMenu(){
       <div class="sl-meta">${pname}<br>机密 · 上会材料</div>
     </div>
     <div class="sl-hdr-line"></div>
-    <div class="sl-body" style="display:flex;align-items:center;">
-      <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:7px 18px;">
+    <div class="sl-body" style="display:flex;align-items:flex-start;overflow:auto;">
+      <div style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;align-content:start;">
         ${contentSlides.map((s,i)=>`
           <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;
             border-radius:4px;background:${i%2===0?'#F5FAF7':'#FAFFFE'};
-            border-left:3px solid ${['#007A3E','#00963A','#34A85A','#5BBE78','#82CE98','#A8DDB5','#C8EDD6','#B0D4BE'][i]||'#007A3E'};">
+            border-left:3px solid ${colors[i%colors.length]};">
             <div style="min-width:26px;height:26px;border-radius:50%;
-              background:${['#007A3E','#00963A','#34A85A','#5BBE78','#82CE98','#A8DDB5','#C8EDD6','#B0D4BE'][i]||'#007A3E'};
+              background:${colors[i%colors.length]};
               color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
               ${s.num}
             </div>
             <div style="min-width:0;">
-              <div style="font-size:11px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
-              <div style="font-size:8.5px;color:#888;margin-top:1px;">${s.desc}</div>
+              <div style="font-size:11px;font-weight:600;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
+              <div style="font-size:8.5px;color:#888;margin-top:1px;">${s.desc||''}</div>
             </div>
           </div>`).join('')}
       </div>
@@ -1392,9 +1431,107 @@ function renderS12(){
   </div>`);
 }
 
+// ══════════════════════════════════════════════
+//  CUSTOM SLIDE — renderer & form
+// ══════════════════════════════════════════════
+function renderCustomSlide(cs,numLabel){
+  if(!cs) return '<div>错误：自定义页面数据丢失</div>';
+  const rhHtml=RH_DIRS.map(d=>`<div class="rh rh-${d}" data-dir="${d}"></div>`).join('');
+
+  // Text blocks — draggable, policy-block styled
+  const blocks=(cs.textBlocks||[]).map(tb=>{
+    const key='tb_'+tb.id;
+    const p=getImgPos(key,tb.x||5,tb.y||8,tb.w||88,tb.h||22);
+    return `<div class="dtb" id="dtb_${tb.id}"
+      data-key="${key}" data-dx="${tb.x||5}" data-dy="${tb.y||8}" data-dw="${tb.w||88}" data-dh="${tb.h||22}"
+      style="left:${p.x}%;top:${p.y}%;width:${p.w}%;height:${p.h}%;">${rhHtml}
+      <div class="dtb-inner">
+        ${tb.heading?`<div class="dtb-heading">${escHtml(tb.heading)}</div>`:''}
+        <div class="dtb-content">${escHtml(tb.content||'')}</div>
+      </div>
+    </div>`;
+  });
+
+  // Free-floating images
+  const imgs=(cs.extraImages||[]).map(img=>
+    draggableImg(img.key,img.url,img.x||5,img.y||50,img.w||42,img.h||42,img.caption||'图片')
+  );
+
+  return shell(numLabel,cs.title||'自定义页面',blocks.join('')+imgs.join(''));
+}
+
+function renderFCustom(cs){
+  if(!cs) return '';
+  const tbRows=(cs.textBlocks||[]).map((tb,i)=>`
+    <div class="dyn-row">
+      <div class="dyn-row-hdr">
+        <span class="dyn-row-lbl">文本块 ${i+1} <span style="font-size:9px;color:#aaa;">（可在幻灯片上拖动）</span></span>
+        <button class="del-btn" onclick="delCustomTB('${cs.id}',${i})">×</button>
+      </div>
+      <div class="fg"><label class="fl">标题（书名号/加粗，留空则不显示）</label>
+        <input class="fi" placeholder="《文件名称》或普通标题..." value="${escAttr(tb.heading||'')}"
+          oninput="updCustomTB('${cs.id}',${i},'heading',this.value)">
+      </div>
+      <div class="fg"><label class="fl">正文内容</label>
+        <textarea class="fi ta" style="min-height:72px" placeholder="正文..."
+          oninput="updCustomTB('${cs.id}',${i},'content',this.value)">${escHtml(tb.content||'')}</textarea>
+      </div>
+    </div>`).join('');
+
+  const imgRows=(cs.extraImages||[]).map((img,i)=>`
+    <div class="dyn-row">
+      <div class="dyn-row-hdr">
+        <span class="dyn-row-lbl">图片 ${i+1} <span style="font-size:9px;color:#aaa;">（可在幻灯片上拖动）</span></span>
+        <button class="del-btn" onclick="delCustomImg('${cs.id}',${i})">×</button>
+      </div>
+      <div class="upload-btn ${img.url?'has-img':''}"
+        onclick="trigCustomImg('${cs.id}',${i})"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="event.preventDefault();this.classList.remove('drag-over');handleCustomImgDrop(event,'${cs.id}',${i})">
+        ${img.url?`<img class="upload-preview" src="${img.url}"><div style="font-size:9px;color:#007A3E;margin-top:3px;">✅ 已上传 — 点击或拖入更换</div>`
+                 :`<div>📁 点击上传 / 直接拖入图片</div>`}
+      </div>
+      <input type="file" accept="image/*" id="custimg_${cs.id}_${i}" style="display:none"
+        onchange="handleCustomImgFile('${cs.id}',${i},this)">
+    </div>`).join('');
+
+  return `<div class="fp-hdr">✏️ ${escHtml(cs.title||'自定义页面')}</div>
+    <div class="fp-sec">
+      <div class="fp-sec-title">页面标题</div>
+      <div class="fg"><label class="fl">标题</label>
+        <input class="fi" placeholder="自定义页面标题" value="${escAttr(cs.title||'')}"
+          oninput="updCustomTitle('${cs.id}',this.value)">
+      </div>
+    </div>
+    <div class="fp-sec">
+      <div class="fp-sec-title">文本内容块</div>
+      <div style="font-size:9px;color:#888;margin-bottom:8px;">每块可在幻灯片上自由拖动、调整尺寸</div>
+      ${tbRows}
+      <button class="add-btn" onclick="addCustomTB('${cs.id}')">＋ 添加文本块</button>
+    </div>
+    <div class="fp-sec">
+      <div class="fp-sec-title">图片</div>
+      <div style="font-size:9px;color:#888;margin-bottom:8px;">图片可在幻灯片上自由拖动、调整尺寸</div>
+      ${imgRows}
+      <button class="add-btn" onclick="addCustomImg('${cs.id}')">＋ 添加图片</button>
+    </div>
+    <div class="fp-sec">
+      <button class="btn" style="width:100%;background:#FFF0F0;color:#CC3333;border:1px solid #FFCCCC;justify-content:center;"
+        onclick="if(confirm('确定删除此自定义页面？'))delCustomSlide('${cs.id}')">
+        🗑 删除此自定义页面
+      </button>
+    </div>`;
+}
+
 function renderSlide(idx){
-  const fns=[renderS0,renderSMenu,renderS1,renderS2,renderS3,renderS4,renderS8,renderS9,renderS12,renderS11];
-  return fns[idx]();
+  const slides=getSlides();
+  const s=slides[idx]; if(!s) return '';
+  const map={s0:renderS0,sMenu:renderSMenu,s1:renderS1,s2:renderS2,s3:renderS3,
+             s4:renderS4,s8:renderS8,s9:renderS9,s12:renderS12,s11:renderS11};
+  if(map[s.id]) return map[s.id]();
+  if(s.isCustom) return renderCustomSlide(s.customData,s.num);
+  return '<div>未知页面</div>';
 }
 
 // ══════════════════════════════════════════════
@@ -1786,8 +1923,13 @@ function renderF12(){
 }
 
 function renderForm(idx){
-  const fns=[renderF0,renderFMenu,renderF1,renderF2,renderF3,renderF4,renderF8,renderF9,renderF12,renderF11];
-  return fns[idx]();
+  const slides=getSlides();
+  const s=slides[idx]; if(!s) return '';
+  const map={s0:renderF0,sMenu:renderFMenu,s1:renderF1,s2:renderF2,s3:renderF3,
+             s4:renderF4,s8:renderF8,s9:renderF9,s12:renderF12,s11:renderF11};
+  if(map[s.id]) return map[s.id]();
+  if(s.isCustom) return renderFCustom(s.customData);
+  return '<div class="fp-sec"><div class="fp-sec-title">无表单</div></div>';
 }
 
 // ══════════════════════════════════════════════
@@ -1818,6 +1960,103 @@ function delNoteItem(i){D.s4.noteItems.splice(i,1);refreshForm();refresh();}
 function addIssue(){D.s11.issues.push({title:'',content:'',problem:'',measure:''});refreshForm();refresh();}
 function delIssue(i){D.s11.issues.splice(i,1);refreshForm();refresh();}
 
+// ── Custom slide mutations ──
+function addCustomSlide(){
+  if(!D.customSlides) D.customSlides=[];
+  const csId='cs_'+Date.now();
+  D.customSlides.push({
+    id:csId, title:'自定义页面',
+    textBlocks:[{id:'tb_'+Date.now(),heading:'',content:'',x:5,y:8,w:88,h:22}],
+    extraImages:[]
+  });
+  saveCurrentProject();
+  renderNav();
+  const idx=getSlides().findIndex(s=>s.id===csId);
+  if(idx>=0) goTo(idx);
+}
+function delCustomSlide(csId){
+  if(!D.customSlides) return;
+  const i=D.customSlides.findIndex(c=>c.id===csId);
+  if(i===-1) return;
+  // clean up imagePos for this slide
+  const cs=D.customSlides[i];
+  if(D.imagePos){
+    (cs.textBlocks||[]).forEach(tb=>delete D.imagePos['tb_'+tb.id]);
+    (cs.extraImages||[]).forEach(img=>delete D.imagePos[img.key]);
+  }
+  D.customSlides.splice(i,1);
+  saveCurrentProject();
+  renderNav();
+  const sl=getSlides();
+  goTo(Math.min(curIdx,sl.length-1));
+}
+function updCustomTitle(csId,val){
+  const cs=D.customSlides&&D.customSlides.find(c=>c.id===csId);
+  if(!cs) return;
+  cs.title=val; renderNav(); refresh();
+}
+function addCustomTB(csId){
+  const cs=D.customSlides&&D.customSlides.find(c=>c.id===csId);
+  if(!cs) return;
+  if(!cs.textBlocks) cs.textBlocks=[];
+  const n=cs.textBlocks.length;
+  cs.textBlocks.push({id:'tb_'+Date.now(),heading:'',content:'',x:5,y:8+n*30,w:88,h:22});
+  refreshForm(); refresh();
+}
+function delCustomTB(csId,i){
+  const cs=D.customSlides&&D.customSlides.find(c=>c.id===csId);
+  if(!cs||!cs.textBlocks) return;
+  const tb=cs.textBlocks[i];
+  if(tb&&D.imagePos) delete D.imagePos['tb_'+tb.id];
+  cs.textBlocks.splice(i,1);
+  refreshForm(); refresh();
+}
+function updCustomTB(csId,i,field,val){
+  const cs=D.customSlides&&D.customSlides.find(c=>c.id===csId);
+  if(!cs||!cs.textBlocks||!cs.textBlocks[i]) return;
+  cs.textBlocks[i][field]=val; refresh();
+}
+function addCustomImg(csId){
+  const cs=D.customSlides&&D.customSlides.find(c=>c.id===csId);
+  if(!cs) return;
+  if(!cs.extraImages) cs.extraImages=[];
+  const n=cs.extraImages.length;
+  const key='csimg_'+csId+'_'+Date.now();
+  cs.extraImages.push({key,url:'',x:5+n*48,y:40,w:42,h:42,caption:'图片'+(n+1)});
+  refreshForm(); refresh();
+}
+function delCustomImg(csId,i){
+  const cs=D.customSlides&&D.customSlides.find(c=>c.id===csId);
+  if(!cs||!cs.extraImages) return;
+  const img=cs.extraImages[i];
+  if(img&&D.imagePos) delete D.imagePos[img.key];
+  cs.extraImages.splice(i,1);
+  refreshForm(); refresh();
+}
+function trigCustomImg(csId,i){document.getElementById('custimg_'+csId+'_'+i).click();}
+function handleCustomImgFile(csId,i,input){
+  const cs=D.customSlides&&D.customSlides.find(c=>c.id===csId);
+  if(!cs||!input.files||!input.files[0]) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    if(cs.extraImages&&cs.extraImages[i]) cs.extraImages[i].url=e.target.result;
+    refresh(); refreshForm();
+  };
+  r.readAsDataURL(input.files[0]);
+}
+function handleCustomImgDrop(e,csId,i){
+  const cs=D.customSlides&&D.customSlides.find(c=>c.id===csId);
+  if(!cs) return;
+  const file=e.dataTransfer&&e.dataTransfer.files[0];
+  if(!file||!file.type.startsWith('image/')) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    if(cs.extraImages&&cs.extraImages[i]) cs.extraImages[i].url=ev.target.result;
+    refresh(); refreshForm();
+  };
+  r.readAsDataURL(file);
+}
+
 function trigUpload(sk,fk){document.getElementById('upf_'+sk+'_'+fk).click();}
 function handleUp(sk,fk,input){
   if(input.files&&input.files[0]){
@@ -1840,17 +2079,26 @@ function handleDocUp(i,input){
 // ══════════════════════════════════════════════
 function goTo(idx){curIdx=idx;renderNav();refresh();refreshForm();}
 function prevSlide(){if(curIdx>0)goTo(curIdx-1);}
-function nextSlide(){if(curIdx<SLIDES.length-1)goTo(curIdx+1);}
+function nextSlide(){const sl=getSlides();if(curIdx<sl.length-1)goTo(curIdx+1);}
 
 function renderNav(){
-  $('slideNav').innerHTML=SLIDES.map((s,i)=>`
-    <div class="sli-item ${i===curIdx?'active':''}" onclick="goTo(${i})">
+  const slides=getSlides();
+  $('slideNav').innerHTML=slides.map((s,i)=>`
+    <div class="sli-item ${i===curIdx?'active':''}" onclick="goTo(${i})"
+      style="position:relative;">
       <div class="sli-num">${s.num}</div>
-      <div class="sli-name">${s.short}</div>
-    </div>`).join('');
-  $('tbDots').innerHTML=SLIDES.map((_,i)=>`<div class="tb-dot ${i===curIdx?'active':''}" onclick="goTo(${i})"></div>`).join('');
-  $('tbInfo').textContent=`${SLIDES[curIdx].name}  （${curIdx+1} / ${SLIDES.length}）`;
-  $('hdrInfo').textContent=`第 ${curIdx+1} 页 / 共 ${SLIDES.length} 页`;
+      <div class="sli-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.short}</div>
+      ${s.isCustom?`<button title="删除此页面" onclick="event.stopPropagation();if(confirm('删除「${s.name}」？'))delCustomSlide('${s.id}')"
+        style="flex-shrink:0;background:none;border:none;color:#CCAAAA;cursor:pointer;font-size:13px;padding:0 2px;line-height:1;margin-left:2px;">×</button>`:''}
+    </div>`).join('')+`
+    <div class="sb-divider"></div>
+    <div style="padding:2px 4px 8px;">
+      <button class="add-btn" onclick="addCustomSlide()" style="font-size:10.5px;">＋ 新增自定义页面</button>
+    </div>`;
+  $('tbDots').innerHTML=slides.map((_,i)=>`<div class="tb-dot ${i===curIdx?'active':''}" onclick="goTo(${i})"></div>`).join('');
+  const cur=slides[curIdx]||slides[0];
+  $('tbInfo').textContent=`${cur.name}  （${curIdx+1} / ${slides.length}）`;
+  $('hdrInfo').textContent=`第 ${curIdx+1} 页 / 共 ${slides.length} 页`;
 }
 
 function updateProgress(){
@@ -1879,9 +2127,13 @@ document.addEventListener('keydown',e=>{
 //  PREVIEW & EXPORT
 // ══════════════════════════════════════════════
 function previewAll(){pmIdx=curIdx;$('preview-modal').style.display='flex';renderPM();}
-function renderPM(){$('pmSlide').innerHTML=renderSlide(pmIdx);$('pmInfo').textContent=`第 ${pmIdx+1} 页 / 共 ${SLIDES.length} 页 — ${SLIDES[pmIdx].name}`;}
+function renderPM(){
+  const sl=getSlides();
+  $('pmSlide').innerHTML=renderSlide(pmIdx);
+  $('pmInfo').textContent=`第 ${pmIdx+1} 页 / 共 ${sl.length} 页 — ${(sl[pmIdx]||sl[0]).name}`;
+}
 function prevPM(){if(pmIdx>0){pmIdx--;renderPM();}}
-function nextPM(){if(pmIdx<SLIDES.length-1){pmIdx++;renderPM();}}
+function nextPM(){const sl=getSlides();if(pmIdx<sl.length-1){pmIdx++;renderPM();}}
 function closePM(){$('preview-modal').style.display='none';}
 
 function getEmbedStyles(){
@@ -1955,7 +2207,7 @@ function printAll(){
     @media print{body{background:#fff;}.page{margin:0;}}
     ${getEmbedStyles()}
   </style></head><body>
-  ${SLIDES.map((_,i)=>`<div class="page">${renderSlide(i)}</div>`).join('')}
+  ${getSlides().map((_,i)=>`<div class="page">${renderSlide(i)}</div>`).join('')}
   <script>window.onload=()=>setTimeout(()=>window.print(),800);<\/script>
   </body></html>`);
   win.document.close();
@@ -2126,7 +2378,16 @@ function openProject(id){
   if(!proj) return;
   currentProjectId=id;
   // Load project data into D
-  Object.keys(D).forEach(k=>{if(proj.data[k])Object.assign(D[k],proj.data[k]);});
+  const saved=proj.data||{};
+  Object.keys(D).forEach(k=>{
+    if(saved[k]===undefined) return;
+    if(Array.isArray(saved[k])){
+      // Deep-replace arrays (covers customSlides, etc.)
+      D[k]=JSON.parse(JSON.stringify(saved[k]));
+    } else if(saved[k]&&typeof saved[k]==='object'){
+      Object.assign(D[k],saved[k]);
+    }
+  });
   // Switch to editor view
   $('dashboard').style.display='none';
   $('appBody').style.display='flex';
