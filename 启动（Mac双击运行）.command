@@ -32,14 +32,14 @@ echo ""
 STARTED=false
 if command -v python3 &>/dev/null; then
   echo "▶ 使用 Python 3 启动本地服务器（端口 $PORT）..."
-  cd "$DIR" && python3 -m http.server "$PORT" &>/dev/null &
+  cd "$DIR" && python3 server.py "$PORT" &>/dev/null &
   SERVER_PID=$!
   STARTED=true
 elif command -v python &>/dev/null; then
   PY_VER=$(python -c "import sys;print(sys.version_info.major)" 2>/dev/null)
   if [ "$PY_VER" = "3" ]; then
     echo "▶ 使用 Python 3 启动本地服务器（端口 $PORT）..."
-    cd "$DIR" && python -m http.server "$PORT" &>/dev/null &
+    cd "$DIR" && python server.py "$PORT" &>/dev/null &
   else
     echo "▶ 使用 Python 2 启动本地服务器（端口 $PORT）..."
     cd "$DIR" && python -m SimpleHTTPServer "$PORT" &>/dev/null &

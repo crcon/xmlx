@@ -227,6 +227,8 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
   border-radius:3px;text-align:center;cursor:pointer;transition:all .18s;color:#8C8C8C;font-size:11px;}
 .upload-btn:hover{border-color:#007A3E;color:#007A3E;background:#F2FAF5;}
 .upload-btn.has-img{border-style:solid;border-color:#007A3E;background:#F2FAF5;}
+.upload-btn.drag-over{border-color:#007A3E;border-style:solid;background:#EAF5EE;
+  color:#007A3E;transform:scale(1.01);box-shadow:0 0 0 3px rgba(0,122,62,.15);}
 .upload-preview{max-width:100%;max-height:70px;object-fit:contain;display:block;
   margin:4px auto 0;border-radius:2px;}
 
@@ -590,7 +592,7 @@ const SLIDES = [
   {id:'sMenu',num:'目录', name:'目录',                     short:'目录'},
   {id:'s1',   num:'一',   name:'项目基本情况',             short:'基本情况'},
   {id:'s2',   num:'二',   name:'政策信息',                 short:'政策信息'},
-  {id:'s3',   num:'三',   name:'项目具体选址',             short:'项目选址'},
+  {id:'s3',   num:'三',   name:'项目概述',                 short:'项目概述'},
   {id:'s4',   num:'四',   name:'电力接入与周边场站情况',   short:'电力接入'},
   {id:'s8',   num:'五',   name:'合作思路及合作条件',       short:'合作思路'},
   {id:'s9',   num:'六',   name:'项目经济性分析（费用）',   short:'成本分析'},
@@ -746,7 +748,7 @@ function renderSMenu(){
   const contentSlides=[
     {num:'一', name:'项目基本情况',           desc:'地址·容量·土地·接入·建设计划'},
     {num:'二', name:'政策信息',               desc:'国家及地方政策支持'},
-    {num:'三', name:'项目具体选址',           desc:'地块情况·区位图·现场照片'},
+    {num:'三', name:'项目概述',               desc:'地址·地块·土地性质·区位图'},
     {num:'四', name:'电力接入与周边场站情况', desc:'变电站·电压等级·外线距离'},
     {num:'五', name:'合作思路及合作条件',     desc:'合作步骤·资源费·股权结构'},
     {num:'六', name:'项目经济性分析（费用）', desc:'投资成本·费用明细'},
@@ -1006,7 +1008,7 @@ function renderS3(){
         </div>`).join('')}
     </div>`:'';
 
-  return shell('三','项目具体选址',`
+  return shell('三','项目概述',`
   <div style="display:grid;grid-template-columns:42% 58%;gap:10px;height:calc(100% - 4px);">
 
     <!-- LEFT: info panel -->
@@ -1419,12 +1421,23 @@ function sec(title,content){return `<div class="fp-sec"><div class="fp-sec-title
 function uploadFG(lbl,sk,fk){
   const url=D[sk]&&D[sk][fk+'Url']?D[sk][fk+'Url']:'';
   return `<div class="fg"><label class="fl">${lbl}</label>
-    <div class="upload-btn ${url?'has-img':''}" onclick="trigUpload('${sk}','${fk}')">
-      ${url?`<img class="upload-preview" src="${url}"><div style="font-size:9px;color:#007A3E;margin-top:3px;">✅ 已上传 — 点击更换</div>`
-           :`<div>📁 点击上传图片</div>`}
+    <div class="upload-btn ${url?'has-img':''}"
+      onclick="trigUpload('${sk}','${fk}')"
+      ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+      ondragleave="event.stopPropagation();this.classList.remove('drag-over')"
+      ondrop="event.preventDefault();event.stopPropagation();this.classList.remove('drag-over');handleImgDrop(event,'${sk}','${fk}')">
+      ${url?`<img class="upload-preview" src="${url}"><div style="font-size:9px;color:#007A3E;margin-top:3px;">✅ 已上传 — 点击或拖入更换</div>`
+           :`<div>📁 点击上传 / 直接拖入图片</div>`}
     </div>
     <input type="file" accept="image/*" id="upf_${sk}_${fk}" style="display:none" onchange="handleUp('${sk}','${fk}',this)">
   </div>`;
+}
+function handleImgDrop(e,sk,fk){
+  const file=e.dataTransfer&&e.dataTransfer.files[0];
+  if(!file||!file.type.startsWith('image/')) return;
+  const r=new FileReader();
+  r.onload=ev=>{D[sk][fk+'Url']=ev.target.result;refresh();refreshForm();};
+  r.readAsDataURL(file);
 }
 function calcBox(lbl,val,unit='万元'){
   return `<div class="calc-box"><span class="calc-lbl">${lbl}</span><span>${val?val+' '+unit:'待计算...'}</span></div>`;
@@ -1530,7 +1543,7 @@ function renderF2(){
 }
 
 function renderF3(){
-  return `<div class="fp-hdr">三、项目具体选址</div>
+  return `<div class="fp-hdr">三、项目概述</div>
   ${sec('选址描述',
     fg('位置详述',ta('description','s3','位置描述、地理条件、交通情况、周边环境...',4)) +
     fg('土地性质',sel('landNature','s3',['工业用地','农用地（需农转用）','未利用地','荒地/荒漠','滩涂','其他'])) +
@@ -1968,7 +1981,32 @@ function hashPass(str){
 function authUsers(){
   try{return JSON.parse(localStorage.getItem(AUTH_KEY)||'[]');}catch(e){return [];}
 }
-function authSaveUsers(u){localStorage.setItem(AUTH_KEY,JSON.stringify(u));}
+// ── 本地文件持久化（运行在 localhost 时自动同步到 yichu_data.json）──
+const IS_LOCAL=['localhost','127.0.0.1'].includes(location.hostname);
+let _syncTimer=null;
+function _scheduleFileSync(){
+  if(!IS_LOCAL) return;
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(()=>{
+    const payload=JSON.stringify({
+      _app:'yichu-meeting-gen',_version:'1.0',
+      savedAt:new Date().toISOString(),
+      users:authUsers(),projects:pmLoad()
+    });
+    fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:payload}).catch(()=>{});
+  },600);
+}
+async function _loadFromFile(){
+  if(!IS_LOCAL) return;
+  try{
+    const r=await fetch('/api/load');
+    if(!r.ok) return;
+    const d=await r.json();
+    if(d.users)  localStorage.setItem(AUTH_KEY,JSON.stringify(d.users));
+    if(d.projects) localStorage.setItem(PM_KEY,JSON.stringify(d.projects));
+  }catch(e){}
+}
+function authSaveUsers(u){localStorage.setItem(AUTH_KEY,JSON.stringify(u));_scheduleFileSync();}
 function getSession(){
   try{return JSON.parse(localStorage.getItem(SESS_KEY)||'null');}catch(e){return null;}
 }
@@ -2054,7 +2092,7 @@ const PM_KEY='yichu_projects';
 let currentProjectId=null;
 
 function pmLoad(){return JSON.parse(localStorage.getItem(PM_KEY)||'{"projects":[]}');}
-function pmSave(store){localStorage.setItem(PM_KEY,JSON.stringify(store));}
+function pmSave(store){localStorage.setItem(PM_KEY,JSON.stringify(store));_scheduleFileSync();}
 
 function getProjects(includeArchived=false){
   const uid=getSession()?.userId;
@@ -2271,9 +2309,12 @@ function init(){
 }
 
 // ── Startup ──
-(function startup(){
-  init(); // prefill D defaults
-  initImgDrag(); // enable drag/resize on slide images
+(async function startup(){
+  // 1. 本地运行时优先从 yichu_data.json 加载数据（同步到 localStorage）
+  await _loadFromFile();
+  // 2. 初始化默认模板数据
+  init();
+  initImgDrag();
   $('appBody').style.display='none';
   $('btnBack').style.display='none';
   ['btnPreview','btnExport','btnPrint'].forEach(b=>$(b).style.display='none');
@@ -2281,12 +2322,12 @@ function init(){
   $('dashboard').style.display='none';
   $('userBadge').style.display='none';
   $('btnLogout').style.display='none';
-  // 检查登录状态
+  // 3. 检查登录状态
   const sess=getSession();
   if(sess){
-    showApp();  // 已登录 → 直接进项目列表
+    showApp();
   } else {
-    $('authScreen').style.display='flex';  // 未登录 → 显示登录页
+    $('authScreen').style.display='flex';
   }
 })();
 </script>

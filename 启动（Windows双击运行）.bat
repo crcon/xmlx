@@ -38,7 +38,7 @@ if %errorlevel% equ 0 (
   python -c "import sys;exit(0 if sys.version_info.major==3 else 1)" >nul 2>&1
   if %errorlevel% equ 0 (
     echo [OK] 检测到 Python 3，正在启动本地服务器（端口 %PORT%）...
-    start /b python -m http.server %PORT% 2>nul
+    start /b python server.py %PORT% 2>nul
     goto :open_browser
   )
 )
@@ -47,7 +47,7 @@ if %errorlevel% equ 0 (
 where py >nul 2>&1
 if %errorlevel% equ 0 (
   echo [OK] 检测到 Python Launcher，正在启动本地服务器（端口 %PORT%）...
-  start /b py -3 -m http.server %PORT% 2>nul
+  start /b py -3 server.py %PORT% 2>nul
   goto :open_browser
 )
 
@@ -55,7 +55,7 @@ if %errorlevel% equ 0 (
 where python3 >nul 2>&1
 if %errorlevel% equ 0 (
   echo [OK] 检测到 Python 3，正在启动本地服务器（端口 %PORT%）...
-  start /b python3 -m http.server %PORT% 2>nul
+  start /b python3 server.py %PORT% 2>nul
   goto :open_browser
 )
 
