@@ -42,6 +42,10 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
   cursor:pointer;transition:all .15s;margin-bottom:2px;border:1px solid transparent;}
 .sli-item:hover{background:#EAF5EE;border-color:#B8DECA;}
 .sli-item.active{background:#EAF5EE;border-color:#007A3E;border-left:3px solid #007A3E;}
+.sli-item[draggable="true"]{cursor:grab;}
+.sli-item[draggable="true"]:active{cursor:grabbing;}
+.sli-item.drag-over{border-top:2px solid #007A3E !important;background:#EAF5EE;}
+.sli-item.drag-ghost{opacity:.4;}
 .sli-num{min-width:22px;height:22px;border-radius:50%;background:#007A3E;color:#fff;
   font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
 .sli-item.active .sli-num{background:#005A2D;}
@@ -586,6 +590,7 @@ const D = {
   },
   imagePos:{},   // {imgKey:{x,y,w,h}} in % of .sl-body dimensions (also stores dtb positions)
   customSlides:[], // [{id,title,textBlocks:[{id,heading,content,x,y,w,h}],extraImages:[{key,url,x,y,w,h,caption}]}]
+  slideOrder:[],   // ordered array of content slide IDs (empty = use default order)
   s12:{
     items:[
       {label:'现货收益', amount:'', notes:'', deduct:false},
@@ -614,29 +619,57 @@ const FIXED_SLIDES_BASE = [
   {id:'s11',  name:'存在的问题及应对措施',       short:'问题措施',desc:'风险分析·解决方案'}
 ];
 const CN_NUMS=['一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六'];
+// Current slide's dynamic number — set by renderSlide() before calling each renderer
+let _curSlideNum='';
 
 function getSlides(){
   const cs=(D.customSlides||[]);
-  const result=[];
-  let numIdx=0; // index into CN_NUMS for content slides
-  for(let i=0;i<FIXED_SLIDES_BASE.length-1;i++){
-    const s=FIXED_SLIDES_BASE[i];
-    const isContent=!['s0','sMenu'].includes(s.id);
-    result.push({...s, num:isContent?CN_NUMS[numIdx++]:(s.id==='s0'?'封面':'目录'), isFixed:true});
-  }
-  // insert custom slides before last fixed (s11)
-  for(const c of cs){
-    result.push({
-      id:c.id, num:CN_NUMS[numIdx++],
-      name:c.title||'自定义页面',
+
+  // Map of ALL content slide definitions (excludes s0 / sMenu)
+  const contentDefs={};
+  FIXED_SLIDES_BASE.filter(s=>!['s0','sMenu'].includes(s.id)).forEach(s=>{
+    contentDefs[s.id]={...s,isFixed:true};
+  });
+  cs.forEach(c=>{
+    contentDefs[c.id]={
+      id:c.id, name:c.title||'自定义页面',
       short:(c.title||'自定义').slice(0,5),
-      desc:c.textBlocks&&c.textBlocks[0]&&c.textBlocks[0].heading?c.textBlocks[0].heading.slice(0,16):'自定义内容',
+      desc:c.textBlocks&&c.textBlocks[0]&&c.textBlocks[0].heading
+        ?c.textBlocks[0].heading.slice(0,16):'自定义内容',
       isCustom:true, customData:c
-    });
+    };
+  });
+
+  // Determine ordered list of content slide IDs
+  let order;
+  const saved=D.slideOrder;
+  if(saved&&saved.length>=1){
+    // use saved order (filter to valid IDs only)
+    order=saved.filter(id=>contentDefs[id]);
+    // add any new slides missing from saved order
+    const missing=Object.keys(contentDefs).filter(id=>!order.includes(id));
+    if(missing.length){
+      const s11pos=order.indexOf('s11');
+      if(s11pos>=0) order=[...order.slice(0,s11pos),...missing,...order.slice(s11pos)];
+      else order=[...order,...missing];
+    }
+  } else {
+    // default: fixed slides in FIXED_SLIDES_BASE order, custom slides, s11 last
+    const fixedContent=FIXED_SLIDES_BASE.filter(s=>!['s0','sMenu'].includes(s.id));
+    const beforeLast=fixedContent.slice(0,-1).map(s=>s.id); // s1,s2,s3,s4,s8,s9,s12
+    order=[...beforeLast,...cs.map(c=>c.id),'s11'];
   }
-  // last fixed slide (s11)
-  const last=FIXED_SLIDES_BASE[FIXED_SLIDES_BASE.length-1];
-  result.push({...last, num:CN_NUMS[numIdx++], isFixed:true});
+
+  // Build result array
+  const result=[
+    {id:'s0',   num:'封面', name:'封面', short:'封面', desc:'', isFixed:true},
+    {id:'sMenu',num:'目录', name:'目录', short:'目录', desc:'', isFixed:true}
+  ];
+  order.forEach((id,i)=>{
+    const s=contentDefs[id];
+    if(!s) return;
+    result.push({...s, num:CN_NUMS[i]});
+  });
   return result;
 }
 
@@ -951,7 +984,7 @@ function renderS1(){
       ${nb(c.notes)}
     </div>`).join('');
 
-  return shell('一','项目基本情况',`
+  return shell(_curSlideNum,'项目基本情况',`
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;height:calc(100% - 4px);">
     ${cardHtml}
   </div>`);
@@ -959,7 +992,7 @@ function renderS1(){
 
 function renderS2(){
   const pols=D.s2.policies.filter(p=>p.title||p.content);
-  return shell('二','政策信息',`
+  return shell(_curSlideNum,'政策信息',`
   <div style="height:calc(100% - 8px);overflow:auto;">
     ${pols.length?pols.map(p=>`
       <div class="policy-block">
@@ -1047,7 +1080,7 @@ function renderS3(){
         </div>`).join('')}
     </div>`:'';
 
-  return shell('三','项目概述',`
+  return shell(_curSlideNum,'项目概述',`
   <div style="display:grid;grid-template-columns:42% 58%;gap:10px;height:calc(100% - 4px);">
 
     <!-- LEFT: info panel -->
@@ -1087,7 +1120,7 @@ function renderS4(){
     {border:'#B39DDB',bg:'#F5F0FF',tc:'#4527A0'},
     {border:'#80CBC4',bg:'#E0F7FA',tc:'#006064'}
   ];
-  return shell('四','电力接入与周边场站情况',`
+  return shell(_curSlideNum,'电力接入与周边场站情况',`
   <!-- 固定内容区：左侧参数表 + 右侧说明 -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;height:calc(100% - 8px);">
     <div style="display:flex;flex-direction:column;gap:7px;">
@@ -1209,7 +1242,7 @@ function renderS8(){
   const d=D.s8;
   const consultTotal=calcConsult(d.consultRate,d.consultMWh);
   const steps=d.steps.filter(s=>s.trim());
-  return shell('五','合作思路及合作条件',`
+  return shell(_curSlideNum,'合作思路及合作条件',`
   <div style="display:grid;grid-template-columns:3fr 2fr;gap:16px;height:calc(100% - 8px);">
     <div>
       <div style="font-size:10px;font-weight:700;color:#007A3E;margin-bottom:9px;padding-bottom:5px;border-bottom:1px solid #D5E6DC;">合作思路</div>
@@ -1264,7 +1297,7 @@ function renderS9(){
   // Recalculate total from augmented rows
   const total=rows.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
 
-  return shell('六','项目经济性分析（费用）',`
+  return shell(_curSlideNum,'项目经济性分析（费用）',`
   <div style="height:calc(100% - 8px);">
     <div style="font-size:10px;color:#007A3E;font-weight:600;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #D5E6DC;">
       ${projectShortName()} &nbsp;投资前期开发费用汇总表（单位：万元）
@@ -1358,7 +1391,7 @@ function renderS11(){
   const emptyRow=`<tr><td colspan="3" style="text-align:center;color:#CCC;font-size:9px;
     padding:22px;font-style:italic;">请在右侧填写问题清单</td></tr>`;
 
-  return shell('八','存在的问题及应对措施',`
+  return shell(_curSlideNum,'存在的问题及应对措施',`
   <div style="display:flex;flex-direction:column;gap:8px;height:calc(100% - 8px);">
     <div style="flex:1;overflow:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:10px;">
@@ -1427,7 +1460,7 @@ function renderS12(){
   const incParts=items.filter(it=>!it.deduct&&parseFloat(it.amount)).map(it=>`+${parseFloat(it.amount).toFixed(2)}`).join(' ');
   const dedParts=items.filter(it=>it.deduct&&parseFloat(it.amount)).map(it=>` − ${parseFloat(it.amount).toFixed(2)}`).join('');
 
-  return shell('七','项目收益分析',`
+  return shell(_curSlideNum,'项目收益分析',`
   <div style="display:flex;flex-direction:column;gap:10px;height:calc(100% - 8px);">
     <!-- 总收益突出展示 -->
     <div style="background:linear-gradient(135deg,#005A2D,#007A3E);border-radius:6px;padding:12px 20px;
@@ -1562,6 +1595,7 @@ function renderFCustom(cs){
 function renderSlide(idx){
   const slides=getSlides();
   const s=slides[idx]; if(!s) return '';
+  _curSlideNum=s.num; // let every renderer read the live number
   const map={s0:renderS0,sMenu:renderSMenu,s1:renderS1,s2:renderS2,s3:renderS3,
              s4:renderS4,s8:renderS8,s9:renderS9,s12:renderS12,s11:renderS11};
   if(map[s.id]) return map[s.id]();
@@ -1936,7 +1970,7 @@ function renderFMenu(){
     <div style="font-weight:600;color:#007A3E;margin-bottom:6px;">目录内容自动同步</div>
     目录页根据各章节标题自动生成，无需手动填写。<br>
     如需修改目录项标题，请切换到对应幻灯片页面进行编辑。<br><br>
-    <span style="color:#888;font-size:11px;">当前包含 7 个正文章节，目录自动列示。</span>
+    <span style="color:#888;font-size:11px;">当前包含 ${getSlides().filter(s=>!['s0','sMenu'].includes(s.id)).length} 个正文章节（含自定义），目录自动列示。</span>
   </div>`;
 }
 
@@ -2151,14 +2185,23 @@ function nextSlide(){const sl=getSlides();if(curIdx<sl.length-1)goTo(curIdx+1);}
 
 function renderNav(){
   const slides=getSlides();
-  $('slideNav').innerHTML=slides.map((s,i)=>`
-    <div class="sli-item ${i===curIdx?'active':''}" onclick="goTo(${i})"
-      style="position:relative;">
-      <div class="sli-num">${s.num}</div>
+  $('slideNav').innerHTML=slides.map((s,i)=>{
+    const draggable=!['s0','sMenu'].includes(s.id);
+    const dragAttrs=draggable
+      ?`draggable="true" id="navItem_${s.id}"
+        ondragstart="navDragStart(event,'${s.id}')"
+        ondragover="navDragOver(event,'${s.id}',event)"
+        ondrop="navDrop(event,'${s.id}')"
+        ondragend="navDragEnd(event,'${s.id}')"
+        ondragleave="navDragLeave(event)"`
+      :`id="navItem_${s.id}"`;
+    return `<div class="sli-item ${i===curIdx?'active':''}" ${dragAttrs} onclick="goTo(${i})" style="position:relative;">
+      <div class="sli-num" title="${draggable?'拖动可调整顺序':''}">${s.num}</div>
       <div class="sli-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.short}</div>
       ${s.isCustom?`<button title="删除此页面" onclick="event.stopPropagation();if(confirm('删除「${s.name}」？'))delCustomSlide('${s.id}')"
         style="flex-shrink:0;background:none;border:none;color:#CCAAAA;cursor:pointer;font-size:13px;padding:0 2px;line-height:1;margin-left:2px;">×</button>`:''}
-    </div>`).join('')+`
+    </div>`;
+  }).join('')+`
     <div class="sb-divider"></div>
     <div style="padding:2px 4px 8px;">
       <button class="add-btn" onclick="addCustomSlide()" style="font-size:10.5px;">＋ 新增自定义页面</button>
@@ -2167,6 +2210,70 @@ function renderNav(){
   const cur=slides[curIdx]||slides[0];
   $('tbInfo').textContent=`${cur.name}  （${curIdx+1} / ${slides.length}）`;
   $('hdrInfo').textContent=`第 ${curIdx+1} 页 / 共 ${slides.length} 页`;
+}
+
+// ══════════════════════════════════════════════
+//  DRAG-TO-REORDER (sidebar)
+// ══════════════════════════════════════════════
+let _dragId=null;
+
+function navDragStart(e,slideId){
+  _dragId=slideId;
+  e.dataTransfer.effectAllowed='move';
+  // ghost on next tick (so element is still visible during drag)
+  setTimeout(()=>{
+    const el=document.getElementById('navItem_'+slideId);
+    if(el) el.classList.add('drag-ghost');
+  },0);
+}
+
+function navDragOver(e,slideId){
+  e.preventDefault();
+  if(!_dragId||_dragId===slideId) return;
+  // clear all, then mark current target
+  document.querySelectorAll('.sli-item.drag-over').forEach(el=>el.classList.remove('drag-over'));
+  const el=document.getElementById('navItem_'+slideId);
+  if(el) el.classList.add('drag-over');
+}
+
+function navDragLeave(e){
+  // only clear if leaving the item entirely (not into a child)
+  const el=e.currentTarget;
+  if(!el.contains(e.relatedTarget)) el.classList.remove('drag-over');
+}
+
+function navDrop(e,targetId){
+  e.preventDefault();
+  if(!_dragId||_dragId===targetId) return;
+
+  const slides=getSlides();
+  const contentOrder=slides.filter(s=>!['s0','sMenu'].includes(s.id)).map(s=>s.id);
+
+  const fromIdx=contentOrder.indexOf(_dragId);
+  const toIdx=contentOrder.indexOf(targetId);
+  if(fromIdx===-1||toIdx===-1) return;
+
+  const newOrder=[...contentOrder];
+  newOrder.splice(fromIdx,1);
+  newOrder.splice(toIdx,0,_dragId);
+
+  D.slideOrder=newOrder;
+  const movedId=_dragId;
+  _dragId=null;
+
+  saveCurrentProject();
+  // stay on the dragged slide
+  const newSlides=getSlides();
+  const newIdx=newSlides.findIndex(s=>s.id===movedId);
+  renderNav();
+  if(newIdx>=0) goTo(newIdx);
+}
+
+function navDragEnd(e,slideId){
+  const el=document.getElementById('navItem_'+slideId);
+  if(el) el.classList.remove('drag-ghost');
+  document.querySelectorAll('.sli-item.drag-over').forEach(el=>el.classList.remove('drag-over'));
+  _dragId=null;
 }
 
 function updateProgress(){
