@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "meeting-generator",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["server.py", "7788"],
+      "cwd": "/Users/c/Music/1.0 发布 APP/sh",
+      "port": 7788
+    }
+  ]
+}

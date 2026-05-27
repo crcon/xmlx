@@ -222,8 +222,16 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
 .doc-row.no{background:#FFF5F5;border-color:#F0BABA;}
 
 /* ========== FORM PANEL ========== */
-.form-panel{width:340px;background:#FAFCFB;border-left:1px solid #D5E6DC;
-  overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;}
+.form-panel-outer{width:340px;display:flex;flex-direction:column;
+  border-left:1px solid #D5E6DC;flex-shrink:0;overflow:hidden;}
+.form-panel{flex:1;background:#FAFCFB;overflow-y:auto;display:flex;flex-direction:column;}
+.form-extras-bar{flex-shrink:0;background:#EBF5EE;border-top:1.5px solid #B8DEC9;
+  padding:7px 12px;display:flex;align-items:center;gap:8px;}
+.feb-label{font-size:9px;color:#007A3E;font-weight:600;letter-spacing:.04em;flex-shrink:0;margin-right:2px;}
+.feb-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:3px;padding:5px 6px;
+  font-size:10px;font-weight:600;color:#005A2D;background:#fff;border:1.5px solid #B8DEC9;
+  border-radius:4px;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap;}
+.feb-btn:hover{background:#D8F0E5;border-color:#007A3E;}
 .fp-hdr{padding:10px 14px;background:#007A3E;color:#fff;
   font-size:12px;font-weight:600;flex-shrink:0;letter-spacing:.02em;}
 .fp-sec{padding:11px 14px;border-bottom:1px solid #EBF2EE;}
@@ -473,7 +481,10 @@ body{background:#F0F4F1;color:#262626;overflow:hidden;}
         </div>
       </div>
     </div>
-    <div class="form-panel" id="formPanel"></div>
+    <div class="form-panel-outer">
+      <div class="form-panel" id="formPanel"></div>
+      <div class="form-extras-bar" id="formExtrasBar" style="display:none;"></div>
+    </div>
   </div>
 </main>
 
@@ -1642,25 +1653,28 @@ function renderFCustom(cs){
     </div>`;
 }
 
-// ── Per-slide extras form panel section ──
+// ── Per-slide extras form panel section (shown at top of form when items exist) ──
 function renderFormExtras(slideId){
   if(!slideId) return '';
   const ex=(D.slideExtras&&D.slideExtras[slideId])||{textBlocks:[],images:[]};
+  const hasTB=(ex.textBlocks||[]).length>0;
+  const hasImg=(ex.images||[]).length>0;
+  if(!hasTB&&!hasImg) return ''; // nothing to manage; use bottom bar to add
   const tbRows=(ex.textBlocks||[]).map((tb,i)=>`
     <div class="dyn-row">
       <div class="dyn-row-hdr">
-        <span class="dyn-row-lbl">文本块 ${i+1} <span style="font-size:9px;color:#aaa;">（可拖动/调整大小）</span></span>
+        <span class="dyn-row-lbl">文字说明 ${i+1}</span>
         <button class="del-btn" onclick="delExtraTB('${slideId}',${i})">×</button>
       </div>
       ${fg('标题（留空则不显示）',`<input class="fi" placeholder="标题..." value="${escAttr(tb.heading||'')}"
         oninput="updExtraTB('${slideId}',${i},'heading',this.value)">`)}
-      ${fg('正文内容',`<textarea class="fi ta sm" style="min-height:60px" placeholder="正文内容..."
+      ${fg('正文内容',`<textarea class="fi ta sm" style="min-height:60px" placeholder="正文..."
         oninput="updExtraTB('${slideId}',${i},'content',this.value)">${escHtml(tb.content||'')}</textarea>`)}
     </div>`).join('');
   const imgRows=(ex.images||[]).map((img,i)=>`
     <div class="dyn-row">
       <div class="dyn-row-hdr">
-        <span class="dyn-row-lbl">图片 ${i+1} <span style="font-size:9px;color:#aaa;">（可拖动/调整大小）</span></span>
+        <span class="dyn-row-lbl">附加图片 ${i+1}</span>
         <button class="del-btn" onclick="delExtraImg('${slideId}',${i})">×</button>
       </div>
       <div class="upload-btn ${img.url?'has-img':''}"
@@ -1668,22 +1682,19 @@ function renderFormExtras(slideId){
         ondragover="event.preventDefault();this.classList.add('drag-over')"
         ondragleave="this.classList.remove('drag-over')"
         ondrop="event.preventDefault();this.classList.remove('drag-over');handleExtraImgDrop(event,'${slideId}',${i})">
-        ${img.url?`<img class="upload-preview" src="${img.url}"><div style="font-size:9px;color:#007A3E;margin-top:3px;">✅ 已上传 — 点击或拖入更换</div>`
-                 :`<div>📁 点击上传 / 直接拖入图片</div>`}
+        ${img.url
+          ?`<img class="upload-preview" src="${img.url}"><div style="font-size:9px;color:#007A3E;margin-top:3px;">✅ 已上传 — 点击或拖入更换</div>`
+          :`<div>📁 点击上传 / 直接拖入图片</div>`}
       </div>
       <input type="file" accept="image/*" id="extimg_${slideId}_${i}" style="display:none"
         onchange="handleExtraImgFile('${slideId}',${i},this)">
     </div>`).join('');
-  return `<div class="fp-sec" style="border-top:2px dashed #C8E6D8;margin-top:10px;padding-top:10px;">
-    <div class="fp-sec-title" style="color:#007A3E;display:flex;align-items:center;gap:6px;">
-      <span>📎 补充内容</span>
-      <span style="font-size:9px;font-weight:400;color:#888;">（叠加在本页幻灯片上，可自由拖动）</span>
+  return `<div class="fp-sec" style="background:#F0FAF5;border-bottom:2px solid #B8DEC9;">
+    <div class="fp-sec-title" style="color:#005A2D;display:flex;align-items:center;gap:6px;">
+      📎 本页补充内容
+      <span style="font-size:9px;font-weight:400;color:#777;">（可在幻灯片上拖动 / 调整大小）</span>
     </div>
-    <div style="font-size:9px;color:#888;margin-bottom:10px;">添加文本块或图片，叠加在现有内容之上，支持拖动和调整大小</div>
-    ${tbRows}
-    <button class="add-btn" onclick="addExtraTB('${slideId}')">＋ 添加文本块</button>
-    ${imgRows?`<div style="margin-top:8px;">${imgRows}</div>`:''}
-    <button class="add-btn" style="margin-top:8px;" onclick="addExtraImg('${slideId}')">＋ 添加图片</button>
+    ${tbRows}${imgRows}
   </div>`;
 }
 
@@ -2120,10 +2131,11 @@ function renderForm(idx){
              s4:renderF4,s8:renderF8,s9:renderF9,s12:renderF12,s11:renderF11};
   let html='';
   if(map[s.id]) html=map[s.id]();
-  else if(s.isCustom) return renderFCustom(s.customData); // custom slides have their own system
+  else if(s.isCustom) return renderFCustom(s.customData);
   else html='<div class="fp-sec"><div class="fp-sec-title">无表单</div></div>';
-  // Append per-slide supplemental content section for all fixed slides
-  html+=renderFormExtras(s.id);
+  // Prepend extras management section so it's visible without scrolling
+  const extrasHtml=renderFormExtras(s.id);
+  if(extrasHtml) html=extrasHtml+html;
   return html;
 }
 
@@ -2136,7 +2148,33 @@ function refresh(){
   updateProgress();
   saveCurrentProject();  // auto-save on every change
 }
-function refreshForm(){$('formPanel').innerHTML=renderForm(curIdx);}
+function renderExtrasBar(slideId){
+  // Always-visible bottom toolbar for adding supplemental content to any fixed slide
+  if(!slideId||slideId==='') return '';
+  const slides=getSlides();
+  const s=slides.find(x=>x.id===slideId);
+  if(!s||s.isCustom) return ''; // custom slides have their own panel
+  return `<span class="feb-label">补充内容</span>
+    <button class="feb-btn" onclick="addExtraImg('${slideId}');refreshExtrasBar()">
+      🖼 插入图片
+    </button>
+    <button class="feb-btn" onclick="addExtraTB('${slideId}');refreshExtrasBar()">
+      📝 插入文字说明
+    </button>`;
+}
+function refreshExtrasBar(){
+  const slides=getSlides();
+  const s=slides[curIdx];
+  const bar=$('formExtrasBar');
+  if(!bar) return;
+  if(!s||s.isCustom){bar.style.display='none';return;}
+  bar.innerHTML=renderExtrasBar(s.id);
+  bar.style.display='flex';
+}
+function refreshForm(){
+  $('formPanel').innerHTML=renderForm(curIdx);
+  refreshExtrasBar();
+}
 
 function addPolicy(){D.s2.policies.push({title:'',content:''});refreshForm();refresh();}
 function delPolicy(i){D.s2.policies.splice(i,1);refreshForm();refresh();}
